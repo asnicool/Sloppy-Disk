@@ -73,14 +73,9 @@ func PerformStreamingSearch(client *ClientConnection, query string, isExact bool
 				}
 
 				// Enrich results
-				if len(results) > 0 {
-					var err error
-					albums, err = cache.EnrichAlbums(results)
-					if err != nil {
-						log.Printf("Error enriching albums: %v", err)
-						albums = results // Fallback to unenriched
-					}
-				}
+				// We skip server-side enrichment to allow instant return of search results.
+				// The frontend will lazy-load details for each album in parallel.
+				albums = results
 			} else {
 				albums, _ = cache.SearchAlbums(query, 0, 100)
 			}
