@@ -197,21 +197,6 @@ const initData = () => {
     }
 }
 
-// Watch for prop changes (e.g. background enrichment finishes and parent passes new data)
-watch(() => props.albumDetails, (newVal) => {
-    if (newVal) {
-        initData()
-        resolveImageSource()
-    }
-}, { deep: true, immediate: true })
-
-// Re-resolve if config loads later
-watch(() => mpdStore.config, () => {
-    if (fullDetails.value) {
-        resolveImageSource()
-    }
-}, { deep: true })
-
 const expanded = ref(false)
 const imageLoaded = ref(false)
 const currentImageSrc = ref('')
@@ -223,6 +208,11 @@ const bgColor = computed(() => {
   const dateSeed = fullDetails.value?.album?.date || ''
   return generateHashColor(props.artist + props.album + dateSeed)
 })
+
+const fallbackToApi = () => {
+    usingStaticUrl.value = false
+    currentImageSrc.value = props.coverUrl || fullDetails.value?.album?.coverUrl || ''
+}
 
 // Resolve the best image source
 const resolveImageSource = () => {
@@ -253,11 +243,6 @@ const resolveImageSource = () => {
     fallbackToApi()
 }
 
-const fallbackToApi = () => {
-    usingStaticUrl.value = false
-    currentImageSrc.value = props.coverUrl || fullDetails.value?.album?.coverUrl || ''
-}
-
 const handleImageLoad = () => {
   imageLoaded.value = true
 }
@@ -272,6 +257,21 @@ const handleImageError = () => {
       currentImageSrc.value = ''
   }
 }
+
+// Watch for prop changes (e.g. background enrichment finishes and parent passes new data)
+watch(() => props.albumDetails, (newVal) => {
+    if (newVal) {
+        initData()
+        resolveImageSource()
+    }
+}, { deep: true, immediate: true })
+
+// Re-resolve if config loads later
+watch(() => mpdStore.config, () => {
+    if (fullDetails.value) {
+        resolveImageSource()
+    }
+}, { deep: true })
 
 // Intersection Observer for lazy loading
 let observer = null

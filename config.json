@@ -1,9 +1,0 @@
-{
-  "mpdHost": "192.168.1.90",
-  "mpdPort": 6600,
-  "musicRoot": "",
-  "coverArtRoot": "",
-  "rsyncRemoteTarget": "",
-  "rsyncOptions": "",
-  "randomAlbumCount": 20
-}

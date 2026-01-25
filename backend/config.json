@@ -5,5 +5,6 @@
   "coverArtRoot": "/mnt/m8box/media/Folder/",
   "coverArtBaseUrl": "http://localhost:8080/",
   "rsyncRemoteTarget": "",
-  "rsyncOptions": ""
+  "rsyncOptions": "",
+  "randomAlbumCount": 20
 }
