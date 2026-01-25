@@ -14,6 +14,7 @@ type Config struct {
 	MPDPassword           string `json:"mpdPassword,omitempty"`
 	MusicRoot             string `json:"musicRoot"`
 	CoverArtRoot          string `json:"coverArtRoot"`
+	CoverArtBaseUrl       string `json:"coverArtBaseUrl"`
 	DiscogsToken          string `json:"discogsToken,omitempty"`
 	RsyncRemoteTarget     string `json:"rsyncRemoteTarget"`
 	RsyncOptions          string `json:"rsyncOptions"`
@@ -100,6 +101,7 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		MPDPassword           *string `json:"mpdPassword"`
 		MusicRoot             *string `json:"musicRoot"`
 		CoverArtRoot          *string `json:"coverArtRoot"`
+		CoverArtBaseUrl       *string `json:"coverArtBaseUrl"`
 		DiscogsToken          *string `json:"discogsToken"`
 		RsyncRemoteTarget     *string `json:"rsyncRemoteTarget"`
 		RsyncOptions          *string `json:"rsyncOptions"`
@@ -132,6 +134,9 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	}
 	if temp.CoverArtRoot != nil {
 		c.CoverArtRoot = *temp.CoverArtRoot
+	}
+	if temp.CoverArtBaseUrl != nil {
+		c.CoverArtBaseUrl = *temp.CoverArtBaseUrl
 	}
 	if temp.DiscogsToken != nil {
 		c.DiscogsToken = *temp.DiscogsToken

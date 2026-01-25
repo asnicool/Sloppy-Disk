@@ -518,6 +518,7 @@ const updateConfig = async (config) => {
       mpdPassword: config.mpdPassword || config.password || config.MPDPassword,
       musicRoot: config.musicRoot,
       coverArtRoot: config.coverArtRoot,
+      coverArtBaseUrl: config.coverArtBaseUrl,
       discogsToken: config.discogsToken,
       rsyncRemoteTarget: config.rsyncRemoteTarget,
       rsyncOptions: config.rsyncOptions,
@@ -717,6 +718,7 @@ export function useMpdStore() {
     get isConnected() { return storeState.isConnected },
     get connectionError() { return storeState.connectionError },
     get localElapsed() { return storeState.localElapsed },
+    get config() { return storeState.config },
     
     // Computed
     currentSong,

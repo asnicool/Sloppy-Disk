@@ -6,19 +6,21 @@
   >
     <!-- Cover Image Section -->
     <div 
-      class="relative aspect-square overflow-hidden bg-gray-700/50"
+      class="relative aspect-square overflow-hidden"
+      :style="{ backgroundColor: bgColor }"
       @click="triggerOverlay"
     >
       <img 
-        v-if="coverUrl || fullDetails?.album?.coverUrl" 
-        :src="coverUrl || fullDetails.album.coverUrl" 
+        v-if="currentImageSrc" 
+        :src="currentImageSrc" 
         :alt="album"
         class="w-full h-full object-cover transition-all duration-700 group-hover:scale-110"
         :class="{ 'opacity-0 scale-95': !imageLoaded, 'opacity-100 scale-100': imageLoaded }"
         @load="handleImageLoad"
         @error="handleImageError"
       />
-      <div v-else class="w-full h-full flex items-center justify-center text-gray-600">
+      <!-- Default Icon (shown when loading or on final error) -->
+      <div v-else class="w-full h-full flex items-center justify-center text-white/20">
         <svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20">
           <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.369 4.369 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" />
         </svg>
@@ -127,9 +129,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
+import { generateHashColor } from '@/utils/color'
 import axios from 'axios'
 
 const props = defineProps({
@@ -198,18 +201,76 @@ const initData = () => {
 watch(() => props.albumDetails, (newVal) => {
     if (newVal) {
         initData()
+        resolveImageSource()
     }
 }, { deep: true, immediate: true })
 
+// Re-resolve if config loads later
+watch(() => mpdStore.config, () => {
+    if (fullDetails.value) {
+        resolveImageSource()
+    }
+}, { deep: true })
+
 const expanded = ref(false)
 const imageLoaded = ref(false)
+const currentImageSrc = ref('')
+const usingStaticUrl = ref(false)
+
+// Generate consistent background color
+const bgColor = computed(() => {
+  // Use what we have: Artist + Album + Date (if available)
+  const dateSeed = fullDetails.value?.album?.date || ''
+  return generateHashColor(props.artist + props.album + dateSeed)
+})
+
+// Resolve the best image source
+const resolveImageSource = () => {
+    // 1. If we have a track path and static config, try that first
+    if (mpdStore.config?.coverArtBaseUrl && fullDetails.value?.tracks?.length > 0) {
+        const trackPath = fullDetails.value.tracks[0].path
+        // Get directory name
+        const lastSlash = trackPath.lastIndexOf('/')
+        if (lastSlash !== -1) {
+            const dir = trackPath.substring(0, lastSlash)
+            // Ensure base url ends with slash and dir doesn't start with slash (or handle it)
+            const baseUrl = mpdStore.config.coverArtBaseUrl.endsWith('/') 
+                ? mpdStore.config.coverArtBaseUrl 
+                : mpdStore.config.coverArtBaseUrl + '/'
+            
+            // Encode the directory path components
+            // But usually web servers expect standard URL encoding
+            // Let's assume the path segments need encoding
+            const encodedDir = dir.split('/').map(encodeURIComponent).join('/')
+            
+            currentImageSrc.value = `${baseUrl}${encodedDir}/Folder.jpg`
+            usingStaticUrl.value = true
+            return
+        }
+    }
+
+    // 2. Fallback to API/Prop
+    fallbackToApi()
+}
+
+const fallbackToApi = () => {
+    usingStaticUrl.value = false
+    currentImageSrc.value = props.coverUrl || fullDetails.value?.album?.coverUrl || ''
+}
 
 const handleImageLoad = () => {
   imageLoaded.value = true
 }
 
 const handleImageError = () => {
-  imageLoaded.value = true
+  if (usingStaticUrl.value) {
+      console.log('Static cover failed, falling back to API')
+      fallbackToApi()
+  } else {
+      // API also failed, clear it to show default icon
+      imageLoaded.value = true // Stop loading animation
+      currentImageSrc.value = ''
+  }
 }
 
 // Intersection Observer for lazy loading
@@ -228,9 +289,12 @@ const fetchDetails = async () => {
     const response = await axios.get(`/api/album/${encodeURIComponent(props.artist)}/${encodeURIComponent(props.album)}`)
     if (response.data.success) {
       fullDetails.value = response.data.data
+      resolveImageSource()
     }
   } catch (error) {
     console.error('Failed to fetch album details:', error)
+    // Even if fetch fails, try to show something if we have props
+    fallbackToApi()
   } finally {
     loading.value = false
   }

@@ -3,6 +3,7 @@
   "mpdPort": 6600,
   "musicRoot": "/mnt/m8box/media/music/",
   "coverArtRoot": "/mnt/m8box/media/Folder/",
+  "coverArtBaseUrl": "http://localhost:8080/",
   "rsyncRemoteTarget": "",
   "rsyncOptions": ""
 }
