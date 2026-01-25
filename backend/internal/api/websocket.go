@@ -252,6 +252,74 @@ func init() {
 	go GlobalBroadcaster.Run()
 }
 
+// SearchWebSocketHandler handles dedicated search connections
+func SearchWebSocketHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("Search WebSocket upgrade error: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	// Create a context for this connection
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client := &ClientConnection{
+		conn:   conn,
+		wsSend: make(chan models.WSMessage, 256),
+		Ctx:    ctx,
+		Cancel: cancel,
+	}
+
+	// Start writer goroutine
+	go func() {
+		ticker := time.NewTicker(pingPeriod)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case msg := <-client.wsSend:
+				conn.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := conn.WriteJSON(msg); err != nil {
+					return
+				}
+			case <-ticker.C:
+				conn.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Set up ping handler
+	conn.SetReadDeadline(time.Now().Add(pongWait))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
+	// Process incoming search requests
+	for {
+		var msg struct {
+			Type     string `json:"type"`
+			Query    string `json:"query"`
+			Exact    bool   `json:"exact"`
+			Category string `json:"category"`
+		}
+		if err := conn.ReadJSON(&msg); err != nil {
+			break
+		}
+
+		if msg.Type == "search" && msg.Query != "" {
+			go PerformStreamingSearch(client, msg.Query, msg.Exact, msg.Category)
+		}
+	}
+}
+
 func WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -316,10 +384,7 @@ func WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		var msg struct {
-			Type     string `json:"type"`
-			Query    string `json:"query"`
-			Exact    bool   `json:"exact"`
-			Category string `json:"category"`
+			Type string `json:"type"`
 		}
 		if err := conn.ReadJSON(&msg); err != nil {
 			log.Printf("WebSocket read error: %v", err)
@@ -328,9 +393,7 @@ func WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		if msg.Type == "search" && msg.Query != "" {
-			go PerformStreamingSearch(client, msg.Query, msg.Exact, msg.Category)
-		} else if msg.Type == "get_status" {
+		if msg.Type == "get_status" {
 			// Send current status to this client
 			if status, err := GlobalBroadcaster.statusMpdClient.GetStatus(); err == nil {
 				select {

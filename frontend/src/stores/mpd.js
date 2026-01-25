@@ -8,6 +8,7 @@ const storeState = reactive({
   playlistCurrentPos: -1,
   isConnected: false,
   ws: null,
+  searchWs: null,
   connectionError: null,
   localElapsed: 0,
   lastStatusTime: 0,
@@ -55,6 +56,7 @@ const connect = async () => {
     
     // Connect WebSocket for real-time updates
     connectWebSocket()
+    connectSearchWebSocket()
   } catch (error) {
     console.error('Failed to connect to MPD:', error)
     storeState.isConnected = false
@@ -116,11 +118,6 @@ const connectWebSocket = () => {
             }
             console.log('Status updated via WebSocket:', storeState.status?.state, storeState.status?.currentSong?.title, 'playlist version:', storeState.status?.playlistVersion)
           }
-        } else if (msg.type === 'search_results') {
-          const { category, items } = msg.data
-          if (searchResults.value[category]) {
-            searchResults.value[category] = items
-          }
         }
       } catch (error) {
         console.error('WebSocket message parse error:', error)
@@ -151,6 +148,47 @@ const connectWebSocket = () => {
     getConfig()
   } catch (error) {
     console.error('Failed to connect WebSocket:', error)
+  }
+}
+
+const connectSearchWebSocket = () => {
+  if (storeState.searchWs && storeState.searchWs.readyState === WebSocket.OPEN) {
+    return
+  }
+  
+  try {
+    if (storeState.searchWs) {
+      storeState.searchWs.close()
+      storeState.searchWs = null
+    }
+
+    storeState.searchWs = new WebSocket(`ws://${window.location.host}/ws/search`)
+    
+    storeState.searchWs.onopen = () => {
+      console.log('Search WebSocket connected')
+    }
+
+    storeState.searchWs.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data)
+        if (msg.type === 'search_results') {
+          const { category, items } = msg.data
+          if (searchResults.value[category]) {
+            searchResults.value[category] = items
+          }
+        }
+      } catch (error) {
+        console.error('Search WebSocket message parse error:', error)
+      }
+    }
+
+    storeState.searchWs.onclose = () => {
+      console.log('Search WebSocket disconnected')
+      storeState.searchWs = null
+      // Reconnect logic could be added here if needed, but search is on-demand
+    }
+  } catch (error) {
+    console.error('Failed to connect Search WebSocket:', error)
   }
 }
 
@@ -366,7 +404,19 @@ const removeFromPlaylist = async (position) => {
 }
 
 const triggerStreamingSearch = (query, exact = false, category = '') => {
-  if (!storeState.ws || storeState.ws.readyState !== WebSocket.OPEN) return
+  // Ensure search WS is connected
+  if (!storeState.searchWs || storeState.searchWs.readyState !== WebSocket.OPEN) {
+    connectSearchWebSocket()
+    // Wait for connection? Or just try to send and let it fail/buffer?
+    // A simple retry mechanism or waiting for open would be better, but for now let's hope it connects fast or was already connected.
+    // Actually, let's delay slightly if not open.
+    if (!storeState.searchWs || storeState.searchWs.readyState !== WebSocket.OPEN) {
+       setTimeout(() => triggerStreamingSearch(query, exact, category), 500)
+       return
+    }
+  }
+  
+  if (!storeState.searchWs || storeState.searchWs.readyState !== WebSocket.OPEN) return
   
   // Reset results if no category or all categories
   if (!category) {
@@ -390,7 +440,7 @@ const triggerStreamingSearch = (query, exact = false, category = '') => {
   }
   isSearching.value = true
   
-  storeState.ws.send(JSON.stringify({
+  storeState.searchWs.send(JSON.stringify({
     type: 'search',
     query: query,
     exact: exact,
@@ -639,6 +689,10 @@ const disconnect = () => {
   if (storeState.ws) {
     storeState.ws.close()
     storeState.ws = null
+  }
+  if (storeState.searchWs) {
+    storeState.searchWs.close()
+    storeState.searchWs = null
   }
   storeState.isConnected = false
 }

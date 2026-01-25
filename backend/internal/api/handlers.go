@@ -77,6 +77,7 @@ func RegisterRoutes(r *mux.Router) {
 
 	// WebSockets
 	r.HandleFunc("/ws", WebsocketHandler)
+	r.HandleFunc("/ws/search", SearchWebSocketHandler)
 	r.HandleFunc("/ws/logs", LogWebsocketHandler)
 
 	// Status refresh (for explicit user requests)
