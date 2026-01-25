@@ -1,0 +1,4 @@
+Registering API routes...
+Backend starting on port 8080
+2025/12/28 22:53:57 listen: listen tcp :8080: bind: address already in use
+exit status 1

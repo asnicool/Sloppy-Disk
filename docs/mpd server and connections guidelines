@@ -1,0 +1,137 @@
+These are mandatory rules for all code in this repository that touches MPD.
+
+
+These guidelines describe how to use the MPD protocol as the single source of truth for a music server, without any intermediate music database.
+​
+
+Core Principles
+Treat MPD as the only persistent store for music library, playback state, and playlists.
+
+Do not mirror MPD’s music database or queue into SQL/NoSQL; keep only in‑memory caches derived from MPD.
+
+Encapsulate all MPD protocol access in a dedicated client module; other code must call this module, not send raw commands.
+
+Protocol Basics
+Communication is line‑oriented over TCP or Unix socket, UTF‑8, request/response.
+
+On connection, read and validate the banner OK MPD <version>.
+
+Each command is terminated by newline; read until a final OK or ACK line.
+
+Responses are key: value lines (e.g. file: ..., Artist: ...); the parser must tolerate repeated keys and multiple objects.
+
+On ACK, expose a structured error with command name and message.
+
+Data Domains to Use
+Music database
+All music metadata and catalog queries must go through MPD commands (list, listallinfo, search, find, count, filter expressions, etc.).
+
+Use MPD’s filter expressions (including logical operators and fields like artist, album, modified‑since, added‑since, audio format) instead of re‑implementing filtering in another store.
+
+Current playback queue
+The active “playlist” is a mutable queue; manipulate it via add, addid, move, delete, shuffle, etc.
+
+Always use the stable item ID (Id) for updates/removals instead of positional index (pos).
+
+Consider MPD’s queue as the single source of truth for playback order, not a copy stored elsewhere.
+
+Stored playlists
+For user playlists and prepared queues, use MPD’s stored playlists and playlist commands (save, rm, playlistadd, playlistmove, playlistclear, etc.).
+
+Encode application semantics via playlist name conventions (e.g. user_<uid>_<slug>), instead of storing playlist membership in a DB.
+
+Events and State Sync
+Use idle/noidle for asynchronous change detection instead of periodic polling.
+
+Maintain one long‑lived “event” connection that repeatedly:
+
+sends idle with relevant subsystems (e.g. database, stored_playlist, playlist, player, mixer, options),
+
+blocks until it receives one or more changed: <subsystem> lines and OK,
+
+emits typed events internally and then sends idle again.
+
+On events:
+
+player, mixer, options → refresh via status (plus currentsong if needed).
+
+playlist → refresh queue via playlistinfo.
+
+database/stored_playlist → refresh only the views/endpoints that depend on them.
+
+Command Lists and Performance
+Use command lists (command_list_ok_begin / command_list_end) to batch related commands into a single round trip.
+
+Typical pattern: for a “status” API, send status and currentsong in one command list and merge the results.
+
+Be aware of MPD limits on command list size and output buffer size; design batch operations to stay within these limits.
+
+Connection Management and Robustness
+Have two logical connection types:
+
+short‑lived or pooled “command” connections,
+
+a single long‑lived “event” connection used only for idle.
+
+On disconnection or timeout, reconnect and rebuild in‑memory state from MPD (e.g. re‑query status, currentsong, and playlistinfo).
+
+Ensure all code paths treat MPD as authoritative; never assume local cache is correct after reconnect without re‑sync.
+
+In‑Memory Caching Strategy
+Maintain small in‑memory caches for:
+
+current status and currentsong,
+
+current queue (playlistinfo result),
+
+optionally common catalog views (e.g. artist list, album list) if needed for UI responsiveness.
+
+Only invalidate/refresh caches in response to idle events, not time‑based polling.
+
+Do not persist these caches to disk; on restart, rebuild them from MPD.
+
+Storage Scope Outside MPD
+Do not store music library, playlists, or playback state outside MPD.
+
+It is acceptable to store non‑musical data (e.g. users, auth, access control, UI preferences) in another store or simple files.
+
+When designing features that require persistence, first check whether they can be modeled as:
+
+MPD stored playlists,
+
+MPD options/state,
+
+or filesystem structure.
+
+MPD Client Module Contract (for code generation)
+The agent should always generate code against an abstraction like this (language‑agnostic):
+
+Connection lifecycle
+
+connect() / close()
+
+automatic reconnect and banner validation
+
+Generic command execution
+
+sendCommand(cmd: string, args: string[]): Response
+
+sendCommandList(commands: Command[]): Response[]
+
+High‑level helpers (examples)
+
+getStatus() → parsed status object
+
+getCurrentSong() → parsed song object
+
+getQueue() → list of queue items (with Id and pos)
+
+addToQueue(uri) / addToQueueAt(uri, pos) / removeFromQueue(id) / moveQueueItem(id, newPos)
+
+searchTracks(filters) / listArtists() / listAlbumsByArtist(artist)
+
+listPlaylists() / getPlaylist(name) / savePlaylist(name) / deletePlaylist(name)
+
+sendIdle(subsystems) / cancelIdle() (on event connection only)
+
+Guideline: generated code must use these high‑level helpers or extend the MPD client module, and must not create new raw protocol calls in unrelated parts of the codebase.

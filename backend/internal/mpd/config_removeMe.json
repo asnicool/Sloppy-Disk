@@ -1,0 +1,8 @@
+{
+  "mpdHost": "",
+  "mpdPort": 0,
+  "musicRoot": "/mnt/music",
+  "coverArtRoot": "",
+  "rsyncRemoteTarget": "",
+  "rsyncOptions": ""
+}

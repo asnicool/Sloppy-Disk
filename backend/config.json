@@ -1,0 +1,8 @@
+{
+  "mpdHost": "192.168.1.90",
+  "mpdPort": 6600,
+  "musicRoot": "/mnt/m8box/media/music/",
+  "coverArtRoot": "/mnt/m8box/media/Folder/",
+  "rsyncRemoteTarget": "",
+  "rsyncOptions": ""
+}

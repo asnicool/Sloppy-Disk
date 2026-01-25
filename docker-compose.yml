@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  mpd-client-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "7070:7070"
+    environment:
+      - MPD_HOST=host.docker.internal
+      - MPD_PORT=6600
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:7070/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mpd-client-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - mpd-client-backend
+    restart: unless-stopped
+
+  # Optional: MPD server for testing
+  mpd-server:
+    image: phlaempfinger/mpd:latest
+    ports:
+      - "6600:6600"
+    volumes:
+      - ./music:/var/lib/mpd/music:ro
+      - ./playlists:/var/lib/mpd/playlists
+      - ./mpd-config:/etc/mpd.conf
+    restart: unless-stopped
+    command: mpd --no-daemon --stdout
+
+networks:
+  default:
+    driver: bridge
