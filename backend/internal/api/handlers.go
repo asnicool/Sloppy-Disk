@@ -82,6 +82,9 @@ func RegisterRoutes(r *mux.Router) {
 
 	// Status refresh (for explicit user requests)
 	api.HandleFunc("/status/refresh", RefreshStatus).Methods("POST")
+
+	// Circuit breaker stats (for monitoring)
+	api.HandleFunc("/circuit-breaker/stats", GetCircuitBreakerStats).Methods("GET")
 }
 
 func GetConfig(w http.ResponseWriter, r *http.Request) {
@@ -141,7 +144,8 @@ func GetConnectionStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetStatus(w http.ResponseWriter, r *http.Request) {
-	status, err := mpd.GetStatusClient().GetStatus()
+	// Use pooled client to avoid head-of-line blocking
+	status, err := mpd.GetClient().GetStatus()
 	if err != nil {
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -150,8 +154,8 @@ func GetStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func RefreshStatus(w http.ResponseWriter, r *http.Request) {
-	// Get current status
-	status, err := mpd.GetStatusClient().GetStatus()
+	// Get current status using pooled client to avoid head-of-line blocking
+	status, err := mpd.GetClient().GetStatus()
 	if err != nil {
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -583,7 +587,8 @@ func GetPlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get current status for current position and playlist length
-	status, err := mpd.GetStatusClient().GetStatus()
+	// Use pooled client to avoid head-of-line blocking
+	status, err := mpd.GetClient().GetStatus()
 	if err != nil {
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -617,4 +622,10 @@ func SendError(w http.ResponseWriter, code int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(models.APIResponse{Success: false, Error: message})
+}
+
+// GetCircuitBreakerStats returns the current state of the circuit breaker
+func GetCircuitBreakerStats(w http.ResponseWriter, r *http.Request) {
+	stats := MPDCircuitBreaker.GetStats()
+	SendJSON(w, models.APIResponse{Success: true, Data: stats})
 }

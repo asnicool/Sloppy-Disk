@@ -36,8 +36,7 @@ type Broadcaster struct {
 	register            chan *ClientConnection
 	unregister          chan *ClientConnection
 	mpdClient           *mpd.Client
-	statusMpdClient     *mpd.Connection // Dedicated client for status updates
-	idleMpdClient       *mpd.Connection // Separate client for IDLE operations to avoid blocking
+	idleMpdClient       *mpd.Connection // Single dedicated client for IDLE operations
 	idleClientConnected bool            // Track if idle client is connected
 	ctx                 context.Context
 	cancel              context.CancelFunc
@@ -55,7 +54,6 @@ func NewBroadcaster() *Broadcaster {
 		register:            make(chan *ClientConnection),
 		unregister:          make(chan *ClientConnection),
 		mpdClient:           mpd.GetClient(),
-		statusMpdClient:     mpd.GetStatusClient(),
 		idleMpdClient:       idleClient,
 		idleClientConnected: false,
 		ctx:                 ctx,
@@ -74,7 +72,8 @@ func (b *Broadcaster) Run() {
 			b.mu.Unlock()
 
 			// Send current status to the newly connected client
-			if status, err := b.statusMpdClient.GetStatus(); err == nil {
+			// Use pooled client to avoid head-of-line blocking
+			if status, err := b.mpdClient.GetStatus(); err == nil {
 				select {
 				case client.wsSend <- models.WSMessage{Type: "status", Data: status}:
 				case <-client.Ctx.Done(): // Check if client disconnected
@@ -114,7 +113,8 @@ func (b *Broadcaster) listenForMPDChanges() {
 			return
 		case <-ticker.C:
 			// Periodic status check as backup when idle fails
-			if status, err := b.statusMpdClient.GetStatus(); err == nil {
+			// Use pooled client to avoid head-of-line blocking
+			if status, err := b.mpdClient.GetStatus(); err == nil {
 				b.Broadcast(status)
 			}
 			b.ensureIdleClientConnection()
@@ -137,8 +137,8 @@ func (b *Broadcaster) listenForMPDChanges() {
 				b.idleClientConnected = false
 				// Attempt to reconnect with exponential backoff
 				b.reconnectIdleClientWithBackoff()
-				// Use regular client to get status if idle failed
-				if status, err := b.statusMpdClient.GetStatus(); err == nil {
+				// Use pooled client to get status if idle failed (to avoid head-of-line blocking)
+				if status, err := b.mpdClient.GetStatus(); err == nil {
 					b.Broadcast(status)
 				}
 				continue
@@ -148,10 +148,25 @@ func (b *Broadcaster) listenForMPDChanges() {
 			// Idle() returns when the idle state is finished (server sends OK), so we are already back in command mode.
 			// No need to call NoIdle() here.
 
+			// Handle database changes by triggering cache refresh
+			for _, subsystem := range changedSubsystems {
+				if subsystem == "database" {
+					log.Println("[Broadcaster] Database changed, triggering cache refresh...")
+					go func() {
+						// Import albumcache package to trigger refresh
+						// This avoids circular import by using a callback approach
+						if databaseChangeCallback != nil {
+							databaseChangeCallback()
+						}
+					}()
+				}
+			}
+
 			// Only fetch status if relevant subsystems changed
 			if b.shouldUpdateStatus(changedSubsystems) {
 				log.Printf("[Broadcaster] Subsystems changed: %v", changedSubsystems)
-				status, err := b.statusMpdClient.GetStatus() // Use the dedicated client for status updates
+				// Use pooled client to avoid head-of-line blocking
+				status, err := b.mpdClient.GetStatus()
 				if err != nil {
 					log.Printf("Error getting MPD status: %v", err)
 				} else {
@@ -233,6 +248,14 @@ func (b *Broadcaster) GetClientsCount() int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return len(b.clients)
+}
+
+// SetDatabaseChangeCallback allows setting a callback function to handle database changes
+// This helps avoid circular import between api and albumcache packages
+var databaseChangeCallback func()
+
+func SetDatabaseChangeCallback(callback func()) {
+	databaseChangeCallback = callback
 }
 
 var upgrader = websocket.Upgrader{
@@ -395,7 +418,8 @@ func WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 
 		if msg.Type == "get_status" {
 			// Send current status to this client
-			if status, err := GlobalBroadcaster.statusMpdClient.GetStatus(); err == nil {
+			// Use pooled client to avoid head-of-line blocking
+			if status, err := GlobalBroadcaster.mpdClient.GetStatus(); err == nil {
 				select {
 				case client.wsSend <- models.WSMessage{Type: "status", Data: status}:
 				case <-ctx.Done():

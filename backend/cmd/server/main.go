@@ -35,6 +35,14 @@ func main() {
 		}
 	})
 
+	// Set up the database change callback to trigger cache refresh
+	api.SetDatabaseChangeCallback(func() {
+		log.Println("Database change detected, refreshing album cache...")
+		if err := albumcache.GetCache().Refresh(); err != nil {
+			log.Printf("Failed to refresh album cache on database change: %v", err)
+		}
+	})
+
 	// Initialize Album Cache
 	go func() {
 		log.Println("Initializing album cache...")
@@ -43,38 +51,9 @@ func main() {
 		}
 	}()
 
-	// Start MPD Idle Listener for Database changes
-	go func() {
-		// Wait for config load and initial connection
-		time.Sleep(2 * time.Second)
-
-		idleClient := mpd.NewIdleClient()
-		for {
-			if err := idleClient.EnsureConnection(); err != nil {
-				log.Printf("Idle client connection failed: %v, retrying in 5s...", err)
-				time.Sleep(5 * time.Second)
-				continue
-			}
-
-			// Wait for database changes
-			changed, err := idleClient.Idle("database")
-			if err != nil {
-				log.Printf("Idle error: %v, retrying...", err)
-				time.Sleep(2 * time.Second) // prevent tight loop on error
-				continue
-			}
-
-			// Check if database changed
-			for _, subsystem := range changed {
-				if subsystem == "database" {
-					log.Println("MPD database changed, refreshing cache...")
-					if err := albumcache.GetCache().Refresh(); err != nil {
-						log.Printf("Cache refresh failed: %v", err)
-					}
-				}
-			}
-		}
-	}()
+	// Note: Database change detection is now handled by the WebSocket broadcaster's
+	// idle listener, which subscribes to all subsystems including "database".
+	// The broadcaster will trigger cache refreshes when database changes occur.
 
 	// 2. Setup Router
 	r := mux.NewRouter()

@@ -331,7 +331,8 @@ func (c *Connection) ToRelativePath(absolutePath string) (string, error) {
 	return rel, nil
 }
 
-// High-level Domain Methods
+// GetStatus retrieves current MPD status using a command list for efficiency
+// This follows the MPD best practice: send status and currentsong in one batch
 func (c *Connection) GetStatus() (*models.MPDStatus, error) {
 	// Use a context with timeout to prevent hanging
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -343,19 +344,24 @@ func (c *Connection) GetStatus() (*models.MPDStatus, error) {
 
 	go func() {
 		defer close(done)
-		resp, cmdErr := c.SendCommand("status")
+		// Use command list to get status and currentsong in a single round trip
+		commands := []string{"status", "currentsong"}
+		responses, cmdErr := c.SendCommandList(commands)
 		if cmdErr != nil {
 			err = cmdErr
 			return
 		}
-		attrs := ParseResponse(resp)
 
-		songResp, cmdErr := c.SendCommand("currentsong")
-		if cmdErr != nil {
-			err = cmdErr
+		if len(responses) != 2 {
+			err = fmt.Errorf("expected 2 responses, got %d", len(responses))
 			return
 		}
-		songAttrs := ParseResponse(songResp)
+
+		// Parse status response
+		attrs := ParseResponse(responses[0])
+		
+		// Parse currentsong response
+		songAttrs := ParseResponse(responses[1])
 
 		status = &models.MPDStatus{
 			State:           attrs["state"],
