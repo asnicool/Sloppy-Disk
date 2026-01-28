@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"mpd-client-modern/internal/config"
 	"mpd-client-modern/internal/coverart"
@@ -486,8 +488,58 @@ func GetCoverArt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Add cache control
-	w.Header().Set("Cache-Control", "public, max-age=300")
+	// Get file info for ETag and Last-Modified
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Generate ETag from file content hash (SHA-256 of file path + modification time)
+	etagContent := fmt.Sprintf("%x-%d", sha256.Sum256([]byte(filePath+fileInfo.ModTime().String())), fileInfo.Size())
+	etag := fmt.Sprintf(`"%s"`, etagContent)
+
+	// Set Last-Modified header
+	lastModified := fileInfo.ModTime().UTC().Format(http.TimeFormat)
+	w.Header().Set("Last-Modified", lastModified)
+
+	// Check If-None-Match header
+	ifNoneMatch := r.Header.Get("If-None-Match")
+	if ifNoneMatch != "" {
+		// Check if ETag matches
+		if strings.Contains(ifNoneMatch, etag) {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+	}
+
+	// Check If-Modified-Since header
+	ifModifiedSince := r.Header.Get("If-Modified-Since")
+	if ifModifiedSince != "" && ifNoneMatch == "" {
+		ifModifiedTime, err := time.Parse(http.TimeFormat, ifModifiedSince)
+		if err == nil && !fileInfo.ModTime().After(ifModifiedTime) {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+	}
+
+	// Set ETag and cache control
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Cache-Control", "public, max-age=300, immutable")
+
+	// Determine content type based on file extension
+	contentType := "image/jpeg"
+	if strings.HasSuffix(strings.ToLower(filePath), ".png") {
+		contentType = "image/png"
+	} else if strings.HasSuffix(strings.ToLower(filePath), ".gif") {
+		contentType = "image/gif"
+	} else if strings.HasSuffix(strings.ToLower(filePath), ".webp") {
+		contentType = "image/webp"
+	}
+	w.Header().Set("Content-Type", contentType)
+
+	// Set Content-Length for better caching
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
 
 	http.ServeFile(w, r, filePath)
 }

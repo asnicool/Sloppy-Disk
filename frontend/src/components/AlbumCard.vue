@@ -1,7 +1,7 @@
 <template>
   <div 
     ref="cardRef" 
-    class="album-card group bg-gray-800/40 rounded-xl overflow-hidden border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 flex flex-col h-full"
+    class="album-card group bg-neutral-800/40 rounded-xl overflow-hidden border border-neutral-700/50 hover:border-primary-500/50 transition-all duration-300 flex flex-col h-full"
     :class="{ 'ring-2 ring-primary-500/20': expanded }"
   >
     <!-- Cover Image Section -->
@@ -82,10 +82,9 @@
       </div>
     </div>
 
-    <!-- Basic Info & Lazy Metadata (delayed until image loads) -->
+    <!-- Basic Info (always visible) & Lazy Metadata -->
     <div 
-      class="p-4 flex-1 flex flex-col transition-all duration-500"
-      :class="{ 'opacity-0 translate-y-2': !imageLoaded, 'opacity-100 translate-y-0': imageLoaded }"
+      class="p-4 flex-1 flex flex-col"
     >
       <div class="flex-1 min-w-0">
         <h3 class="text-sm font-bold text-gray-100 truncate group-hover:text-primary-400 transition-colors" :title="album">{{ album }}</h3>
@@ -97,25 +96,28 @@
         </p>
       </div>
 
-      <!-- Lazy Loaded Metadata Summary -->
-      <div v-if="fullDetails" class="mt-3 flex flex-wrap items-center gap-2 animate-in fade-in slide-in-from-bottom-1 duration-500">
+      <!-- Immediate Metadata (from props) -->
+      <div v-if="date || genre" class="mt-2 flex flex-wrap items-center gap-2">
         <span 
-          v-if="fullDetails.album.date" 
-          class="px-2 py-0.5 bg-gray-700/50 text-[10px] text-gray-300 rounded-md border border-gray-600/30 hover:bg-gray-600 cursor-pointer transition-colors"
-          @click.stop="filterBy('date', fullDetails.album.date)"
+          v-if="date" 
+          class="px-2 py-0.5 bg-neutral-700/50 text-[10px] text-neutral-300 rounded-md border border-neutral-600/30 hover:bg-neutral-600 cursor-pointer transition-colors"
+          @click.stop="filterBy('date', date)"
         >
-          {{ fullDetails.album.date }}
+          {{ date }}
         </span>
         <span 
-          v-if="fullDetails.album.genre" 
-          class="px-2 py-0.5 max-w-[100px] truncate bg-gray-700/50 text-[10px] text-gray-300 rounded-md border border-gray-600/30 hover:bg-gray-600 cursor-pointer transition-colors"
-          @click.stop="filterBy('genre', fullDetails.album.genre)"
-          :title="fullDetails.album.genre"
+          v-if="genre" 
+          class="px-2 py-0.5 max-w-[100px] truncate bg-neutral-700/50 text-[10px] text-neutral-300 rounded-md border border-neutral-600/30 hover:bg-neutral-600 cursor-pointer transition-colors"
+          @click.stop="filterBy('genre', genre)"
+          :title="genre"
         >
-          {{ fullDetails.album.genre }}
+          {{ genre }}
         </span>
+      </div>
+
+      <!-- Lazy Loaded Additional Metadata (from fullDetails) -->
+      <div v-if="fullDetails && (fullDetails.album.trackCount || fullDetails.album.duration)" class="mt-2 flex flex-wrap items-center gap-2 animate-in fade-in slide-in-from-bottom-1 duration-500">
         <button 
-          v-if="fullDetails.album.trackCount || fullDetails.album.duration"
           @click.stop="navigateToDetails"
           class="px-2 py-0.5 bg-primary-500/20 text-[10px] text-primary-400 rounded-md border border-primary-500/30 hover:bg-primary-500/40 hover:text-white transition-all flex items-center font-bold"
         >
@@ -129,7 +131,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
 import { generateHashColor } from '@/utils/color'
@@ -145,6 +147,14 @@ const props = defineProps({
     required: true
   },
   coverUrl: {
+    type: String,
+    default: ''
+  },
+  date: {
+    type: String,
+    default: ''
+  },
+  genre: {
     type: String,
     default: ''
   },
@@ -286,9 +296,10 @@ const fetchDetails = async () => {
   
   loading.value = true
   try {
-    const response = await axios.get(`/api/album/${encodeURIComponent(props.artist)}/${encodeURIComponent(props.album)}`)
-    if (response.data.success) {
-      fullDetails.value = response.data.data
+    // Use mpdStore to leverage cache (stale-while-revalidate pattern)
+    const response = await mpdStore.fetchAlbumSongs(props.artist, props.album)
+    if (response && response.album) {
+      fullDetails.value = response
       resolveImageSource()
     }
   } catch (error) {
@@ -339,6 +350,17 @@ const formatDuration = (seconds) => {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+// Handle cache update events from background refresh
+const handleCacheUpdate = (event) => {
+  const { artist, album, data } = event.detail
+  // Check if this update is for this album
+  if (artist === props.artist && album === props.album) {
+    console.log('[AlbumCard] Cache updated for:', artist, '-', album)
+    fullDetails.value = data
+    resolveImageSource()
+  }
+}
+
 onMounted(() => {
   observer = new IntersectionObserver((entries) => {
     if (entries[0].isIntersecting) {
@@ -353,12 +375,17 @@ onMounted(() => {
   if (cardRef.value) {
     observer.observe(cardRef.value)
   }
+  
+  // Listen for cache update events
+  window.addEventListener('album-cache-updated', handleCacheUpdate)
 })
 
 onUnmounted(() => {
   if (observer) {
     observer.disconnect()
   }
+  // Remove cache update listener
+  window.removeEventListener('album-cache-updated', handleCacheUpdate)
 })
 </script>
 
@@ -376,11 +403,11 @@ onUnmounted(() => {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #374151;
+  background: #52525b;
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #4b5563;
+  background: #71717a;
 }
 
 @keyframes fadeIn {

@@ -1,11 +1,11 @@
 <template>
   <div class="space-y-6">
     <h1 class="text-3xl font-bold text-white">Artists</h1>
-    <div v-if="loading" class="text-gray-400">Loading artists...</div>
+    <div v-if="loading" class="text-neutral-400">Loading artists...</div>
     <div v-else class="space-y-8">
       <div v-for="artistGroup in artists" :key="artistGroup.artist" class="space-y-4">
-        <h2 class="text-2xl font-semibold text-primary-400 border-b border-gray-800 pb-2 flex items-center">
-          <svg class="w-6 h-6 mr-2 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+        <h2 class="text-2xl font-semibold text-primary-400 border-b border-neutral-800 pb-2 flex items-center">
+          <svg class="w-6 h-6 mr-2 text-neutral-400" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
           </svg>
           {{ artistGroup.artist || 'Unknown Artist' }}
@@ -16,14 +16,14 @@
             v-for="album in artistGroup.albums" 
             :key="album"
             @click="navigateToAlbum(artistGroup.artist, album)"
-            class="group bg-gray-900/50 rounded-lg p-3 hover:bg-gray-800 transition-all cursor-pointer border border-gray-800 hover:border-primary-500/50"
+            class="group bg-neutral-900/50 rounded-lg p-3 hover:bg-neutral-800 transition-all cursor-pointer border border-neutral-800 hover:border-primary-500/50"
           >
-            <div class="aspect-square bg-gray-800 rounded-md mb-2 flex items-center justify-center overflow-hidden">
-               <svg class="w-12 h-12 text-gray-700" fill="currentColor" viewBox="0 0 20 20">
+            <div class="aspect-square bg-neutral-800 rounded-md mb-2 flex items-center justify-center overflow-hidden">
+               <svg class="w-12 h-12 text-neutral-700" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8H5v2h2V8zm2 0h2v2H9V8zm6 0h-2v2h2V8z" />
               </svg>
             </div>
-            <p class="text-sm font-medium text-gray-200 truncate group-hover:text-primary-400">{{ album }}</p>
+            <p class="text-sm font-medium text-neutral-200 truncate group-hover:text-primary-400">{{ album }}</p>
           </div>
         </div>
       </div>
@@ -34,7 +34,7 @@
       <button 
         @click="prevPage" 
         :disabled="currentPage <= 1"
-        class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        class="px-4 py-2 bg-neutral-700 text-white rounded-lg hover:bg-neutral-600 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Previous
       </button>
@@ -42,7 +42,7 @@
       <button 
         @click="nextPage" 
         :disabled="currentPage >= totalPages"
-        class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        class="px-4 py-2 bg-neutral-700 text-white rounded-lg hover:bg-neutral-600 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Next
       </button>

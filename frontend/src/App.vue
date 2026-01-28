@@ -43,9 +43,19 @@
           </div>
           
           <div class="flex items-center space-x-4">
+            <!-- Keyboard Shortcuts Help -->
+            <button
+              @click="$refs.shortcutsHelp?.open()"
+              class="p-2 text-neutral-400 hover:text-white transition-colors"
+              title="Keyboard shortcuts (?)">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+            
             <!-- Connection Status -->
             <div class="flex items-center space-x-2" :title="isConnected ? 'Connected' : 'Disconnected'">
-              <div 
+              <div
                 :class="[
                   'w-2 h-2 rounded-full',
                   isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'
@@ -59,22 +69,33 @@
 
     <!-- Main Content -->
     <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 pb-32">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <transition name="page" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
     </main>
 
     <!-- Player Controls (Fixed Bottom) -->
     <PlayerControls v-if="showPlayerControls" class="fixed bottom-0 left-0 right-0 z-30" />
+    
+    <!-- Keyboard Shortcuts Help Modal -->
+    <KeyboardShortcutsHelp ref="shortcutsHelp" />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
 import PlayerControls from '@/components/PlayerControls.vue'
+import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp.vue'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 
 const mpdStore = useMpdStore()
 const route = useRoute()
+const router = useRouter()
+const shortcutsHelp = ref(null)
 
 const isConnected = computed(() => mpdStore.isConnected)
 const currentSong = computed(() => mpdStore.status?.currentSong)
@@ -82,6 +103,50 @@ const showPlayerControls = computed(() => {
   return currentSong.value && 
          route.name !== 'nowplaying' && 
          route.name !== 'queue'
+})
+
+// Keyboard shortcuts
+useKeyboardShortcuts({
+  onPlayPause: () => {
+    if (mpdStore.isPlaying) {
+      mpdStore.pause()
+    } else {
+      mpdStore.play()
+    }
+  },
+  onNext: () => mpdStore.next(),
+  onPrevious: () => mpdStore.previous(),
+  onVolumeUp: () => {
+    const newVolume = Math.min((mpdStore.volume || 0) + 5, 100)
+    mpdStore.setVolume(newVolume)
+  },
+  onVolumeDown: () => {
+    const newVolume = Math.max((mpdStore.volume || 0) - 5, 0)
+    mpdStore.setVolume(newVolume)
+  },
+  onMute: () => {
+    const currentVolume = mpdStore.volume || 0
+    if (currentVolume > 0) {
+      mpdStore.previousVolume = currentVolume
+      mpdStore.setVolume(0)
+    } else {
+      mpdStore.setVolume(mpdStore.previousVolume || 50)
+    }
+  },
+  onSearch: () => {
+    router.push('/search')
+    // Focus search input after navigation
+    setTimeout(() => {
+      const searchInput = document.querySelector('input[type="text"]')
+      searchInput?.focus()
+    }, 100)
+  },
+  onNavigate: (index) => {
+    const routes = ['albums', 'artists', 'dates', 'genres', 'library', 'search', 'queue']
+    if (routes[index]) {
+      router.push(`/${routes[index]}`)
+    }
+  }
 })
 
 onMounted(() => {
@@ -128,5 +193,21 @@ button, .clickable {
 
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Page Transitions */
+.page-enter-active,
+.page-leave-active {
+  transition: all 0.2s ease-out;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>

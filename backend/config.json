@@ -6,5 +6,7 @@
   "coverArtBaseUrl": "http://localhost:8080/",
   "rsyncRemoteTarget": "",
   "rsyncOptions": "",
-  "randomAlbumCount": 20
+  "randomAlbumCount": 20,
+  "enableActivityRefresh": true,
+  "coverArtBaseUrl": "https://m8box.local/folder/"
 }

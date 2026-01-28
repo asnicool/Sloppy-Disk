@@ -2,14 +2,14 @@
   <div v-if="albumDetails" class="space-y-8">
     <!-- Album Header -->
     <div class="flex flex-col md:flex-row items-start md:items-end space-y-4 md:space-y-0 md:space-x-6">
-      <div class="w-48 h-48 bg-gray-800 rounded-lg flex items-center justify-center relative group overflow-hidden shadow-2xl">
+      <div class="w-48 h-48 bg-neutral-800 rounded-lg flex items-center justify-center relative group overflow-hidden shadow-2xl">
         <img 
           v-if="albumDetails?.coverUrl" 
           :src="albumDetails.coverUrl" 
           :alt="albumName"
           class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
-        <svg v-else class="w-20 h-20 text-gray-700" fill="currentColor" viewBox="0 0 20 20">
+        <svg v-else class="w-20 h-20 text-neutral-700" fill="currentColor" viewBox="0 0 20 20">
           <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.369 4.369 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" />
         </svg>
         <button 
@@ -21,11 +21,11 @@
       </div>
       <div class="flex-1">
         <h1 class="text-4xl font-bold text-white mb-2">{{ albumName }}</h1>
-        <p class="text-xl text-gray-400 mb-2">{{ artistName }}</p>
+        <p class="text-xl text-neutral-400 mb-2">{{ artistName }}</p>
         <div v-if="albumDetails" class="flex flex-wrap gap-3 mb-4 text-sm">
-          <span v-if="albumDetails.date" class="text-gray-500">{{ albumDetails.date }}</span>
-          <span v-if="albumDetails.genre" class="text-gray-500 px-2 border-l border-gray-700">{{ albumDetails.genre }}</span>
-          <span v-if="albumDetails.trackCount" class="text-gray-500 px-2 border-l border-gray-700">{{ albumDetails.trackCount }} tracks</span>
+          <span v-if="albumDetails.date" class="text-neutral-500">{{ albumDetails.date }}</span>
+          <span v-if="albumDetails.genre" class="text-neutral-500 px-2 border-l border-neutral-700">{{ albumDetails.genre }}</span>
+          <span v-if="albumDetails.trackCount" class="text-neutral-500 px-2 border-l border-neutral-700">{{ albumDetails.trackCount }} tracks</span>
         </div>
         <div class="flex space-x-4">
           <button @click="searchMetadata" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded transition-colors">
@@ -36,9 +36,9 @@
     </div>
 
     <!-- Tracks List -->
-    <div class="bg-gray-800 rounded-lg overflow-hidden">
+    <div class="bg-neutral-800 rounded-lg overflow-hidden">
       <table class="w-full text-left">
-        <thead class="bg-gray-700 text-gray-400 text-sm uppercase">
+        <thead class="bg-neutral-700 text-neutral-400 text-sm uppercase">
           <tr>
             <th class="px-6 py-3 font-medium">#</th>
             <th class="px-6 py-3 font-medium">Title</th>
@@ -46,11 +46,11 @@
             <th class="px-6 py-3 font-medium"></th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-700">
-          <tr v-for="(track, index) in tracks" :key="track.path" class="hover:bg-gray-700 transition-colors group">
-            <td class="px-6 py-4 text-gray-400">{{ track.track || index + 1 }}</td>
+        <tbody class="divide-y divide-neutral-700">
+          <tr v-for="(track, index) in tracks" :key="track.path" class="hover:bg-neutral-700 transition-colors group">
+            <td class="px-6 py-4 text-neutral-400">{{ track.track || index + 1 }}</td>
             <td class="px-6 py-4 text-white">{{ track.title }}</td>
-            <td class="px-6 py-4 text-gray-400">{{ formatDuration(track.duration) }}</td>
+            <td class="px-6 py-4 text-neutral-400">{{ formatDuration(track.duration) }}</td>
             <td class="px-6 py-4 text-right">
               <button @click="playTrack(track)" class="text-blue-400 hover:text-blue-300 opacity-0 group-hover:opacity-100 transition-opacity">
                 Play
@@ -63,23 +63,23 @@
 
     <!-- Metadata Search Modal -->
     <div v-if="showMetadataModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div class="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
-        <div class="p-6 border-b border-gray-700 flex justify-between items-center">
+      <div class="bg-neutral-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <div class="p-6 border-b border-neutral-700 flex justify-between items-center">
           <h2 class="text-xl font-bold text-white">Metadata Candidates</h2>
-          <button @click="showMetadataModal = false" class="text-gray-400 hover:text-white">&times;</button>
+          <button @click="showMetadataModal = false" class="text-neutral-400 hover:text-white">&times;</button>
         </div>
         <div class="p-6 overflow-y-auto flex-1 space-y-4">
-          <div v-if="searchingMetadata" class="text-center py-8 text-gray-400">Searching Discogs...</div>
-          <div v-else-if="metadataCandidates.length === 0" class="text-center py-8 text-gray-400">No candidates found.</div>
-          <div 
-            v-for="candidate in metadataCandidates" 
+          <div v-if="searchingMetadata" class="text-center py-8 text-neutral-400">Searching Discogs...</div>
+          <div v-else-if="metadataCandidates.length === 0" class="text-center py-8 text-neutral-400">No candidates found.</div>
+          <div
+            v-for="candidate in metadataCandidates"
             :key="candidate.externalId"
-            class="bg-gray-700 p-4 rounded-lg flex justify-between items-center hover:bg-gray-600 cursor-pointer transition-colors"
+            class="bg-neutral-700 p-4 rounded-lg flex justify-between items-center hover:bg-neutral-600 cursor-pointer transition-colors"
             @click="applyMetadata(candidate)"
           >
             <div>
               <h3 class="text-white font-medium">{{ candidate.album }}</h3>
-              <p class="text-gray-400 text-sm">{{ candidate.artist }} ({{ candidate.year }})</p>
+              <p class="text-neutral-400 text-sm">{{ candidate.artist }} ({{ candidate.year }})</p>
               <p class="text-blue-400 text-xs mt-1">Source: {{ candidate.source }}</p>
             </div>
             <button class="text-blue-400 font-medium">Apply</button>
@@ -90,18 +90,18 @@
 
     <!-- Cover Picker Modal -->
     <div v-if="showCoverPicker" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div class="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col">
-        <div class="p-6 border-b border-gray-700 flex justify-between items-center">
+      <div class="bg-neutral-800 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <div class="p-6 border-b border-neutral-700 flex justify-between items-center">
           <h2 class="text-xl font-bold text-white">Pick Cover Art</h2>
-          <button @click="showCoverPicker = false" class="text-gray-400 hover:text-white">&times;</button>
+          <button @click="showCoverPicker = false" class="text-neutral-400 hover:text-white">&times;</button>
         </div>
         <div class="p-6 overflow-y-auto flex-1">
-          <div v-if="fetchingCovers" class="text-center py-8 text-gray-400">Fetching covers...</div>
+          <div v-if="fetchingCovers" class="text-center py-8 text-neutral-400">Fetching covers...</div>
           <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div 
-              v-for="cover in coverCandidates" 
+            <div
+              v-for="cover in coverCandidates"
               :key="cover.url"
-              class="relative aspect-square bg-gray-700 rounded overflow-hidden group cursor-pointer"
+              class="relative aspect-square bg-neutral-700 rounded overflow-hidden group cursor-pointer"
               @click="selectCover(cover)"
             >
               <img :src="cover.url" class="w-full h-full object-cover" alt="Cover candidate">
@@ -117,7 +117,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
 
@@ -211,8 +211,26 @@ const formatDuration = (seconds) => {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
 }
 
+// Handle cache update events from background refresh
+const handleCacheUpdate = (event) => {
+  const { artist, album, data } = event.detail
+  // Check if this update is for this album
+  if (artist === artistName.value && album === albumName.value) {
+    console.log('[AlbumDetailView] Cache updated for:', artist, '-', album)
+    albumDetails.value = data.album
+    tracks.value = data.tracks
+  }
+}
+
 onMounted(() => {
   fetchAlbumDetails()
   fetchCovers()
+  // Listen for cache update events
+  window.addEventListener('album-cache-updated', handleCacheUpdate)
+})
+
+onUnmounted(() => {
+  // Remove cache update listener
+  window.removeEventListener('album-cache-updated', handleCacheUpdate)
 })
 </script>
