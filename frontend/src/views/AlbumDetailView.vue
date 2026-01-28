@@ -1,5 +1,8 @@
 <template>
-  <div v-if="albumDetails" class="space-y-8">
+  <div v-if="loading" class="flex items-center justify-center h-64">
+    <div class="text-neutral-400">Loading album details...</div>
+  </div>
+  <div v-else-if="albumDetails" class="space-y-8">
     <!-- Album Header -->
     <div class="flex flex-col md:flex-row items-start md:items-end space-y-4 md:space-y-0 md:space-x-6">
       <div class="w-48 h-48 bg-neutral-800 rounded-lg flex items-center justify-center relative group overflow-hidden shadow-2xl">
@@ -141,14 +144,34 @@ const coverCandidates = ref([])
 
 const fetchAlbumDetails = async () => {
   loading.value = true
+  console.log('[AlbumDetailView] Fetching album details:', artistName.value, '-', albumName.value)
   try {
     const response = await mpdStore.fetchAlbumSongs(artistName.value, albumName.value)
+    console.log('[AlbumDetailView] API response:', response)
+    
+    // Handle both cache (direct data) and API (wrapped) responses
+    let albumData = null
     if (response.success) {
-      albumDetails.value = response.data.album
+      // Fresh API response: { success: true, data: { album, tracks } }
+      albumData = response.data.album
       tracks.value = response.data.tracks
+    } else if (response.album && response.tracks) {
+      // Cached response: { album, tracks }
+      albumData = response.album
+      tracks.value = response.tracks
     }
+    
+    if (albumData) {
+      console.log('[AlbumDetailView] Setting albumDetails:', albumData)
+      albumDetails.value = albumData
+    } else {
+      console.error('[AlbumDetailView] Could not parse response:', response)
+    }
+  } catch (error) {
+    console.error('[AlbumDetailView] Error fetching album details:', error)
   } finally {
     loading.value = false
+    console.log('[AlbumDetailView] Loading complete, albumDetails:', albumDetails.value)
   }
 }
 

@@ -72,10 +72,10 @@ func RegisterRoutes(r *mux.Router) {
 	// Metadata
 	api.HandleFunc("/metadata/search", SearchMetadata).Methods("GET")
 
-	// Cover Art
-	api.HandleFunc("/coverart/{path:.*}", GetCoverArt).Methods("GET")
+	// Cover Art - specific routes first, then catch-all
 	api.HandleFunc("/coverart/candidates", GetCoverArtCandidates).Methods("GET")
 	api.HandleFunc("/coverart/apply", ApplyCoverArt).Methods("POST")
+	api.HandleFunc("/coverart/{path:.*}", GetCoverArt).Methods("GET")
 
 	// WebSockets
 	r.HandleFunc("/ws", WebsocketHandler)

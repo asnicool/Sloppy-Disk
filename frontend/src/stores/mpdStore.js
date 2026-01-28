@@ -336,13 +336,16 @@ export const useMpdStore = defineStore('mpd', () => {
       // Cache miss or force refresh - fetch from API
       console.log('[MPD Store] Cache miss or force refresh:', artist, '-', album)
       const response = await axios.get(`${API_BASE}/album/${encodeURIComponent(artist)}/${encodeURIComponent(album)}?${params}`)
+      console.log('[MPD Store] API response status:', response.status, response.data)
       
       if (response.data.success) {
         // Cache the response
         albumCache.set(artist, album, response.data.data)
+        console.log('[MPD Store] Cached data:', response.data.data)
         return response.data.data
       }
       
+      console.error('[MPD Store] API returned success=false:', response.data)
       return response.data
     } catch (error) {
       console.error('Fetch album songs failed:', error)
@@ -531,6 +534,76 @@ export const useMpdStore = defineStore('mpd', () => {
     console.log('[MPD Store] Cache invalidated for:', artist, '-', album)
   }
 
+  // Cover Art functions
+  const fetchCoverArtCandidates = async (artist, album) => {
+    try {
+      const params = new URLSearchParams({
+        artist: artist,
+        album: album
+      })
+      const response = await axios.get(`${API_BASE}/coverart/candidates?${params}`)
+      return response.data
+    } catch (error) {
+      console.error('Fetch cover art candidates failed:', error)
+      throw error
+    }
+  }
+
+  const applyCoverArt = async (albumPath, imageUrl) => {
+    try {
+      const response = await axios.post(`${API_BASE}/coverart/apply`, {
+        albumPath: albumPath,
+        imageUrl: imageUrl
+      })
+      return response.data
+    } catch (error) {
+      console.error('Apply cover art failed:', error)
+      throw error
+    }
+  }
+
+  // Metadata search function
+  const fetchMetadataCandidates = async (artist, album) => {
+    try {
+      const params = new URLSearchParams({
+        artist: artist,
+        album: album
+      })
+      const response = await axios.get(`${API_BASE}/metadata/search?${params}`)
+      return response.data
+    } catch (error) {
+      console.error('Fetch metadata candidates failed:', error)
+      throw error
+    }
+  }
+
+  // Polling for status updates (fallback for when WebSocket fails)
+  const startPolling = () => {
+    if (pollInterval.value) {
+      console.log('[MPD Store] Polling already active, skipping')
+      return
+    }
+    
+    console.log('[MPD Store] Starting status polling')
+    
+    // Poll every 30 seconds as fallback
+    pollInterval.value = setInterval(async () => {
+      try {
+        await refreshStatus()
+      } catch (error) {
+        console.error('[MPD Store] Polling refresh failed:', error)
+      }
+    }, 30000)
+  }
+
+  const stopPolling = () => {
+    if (pollInterval.value) {
+      console.log('[MPD Store] Stopping status polling')
+      clearInterval(pollInterval.value)
+      pollInterval.value = null
+    }
+  }
+
   return {
     // State
     status,
@@ -577,6 +650,11 @@ export const useMpdStore = defineStore('mpd', () => {
     updateConfig,
     getCacheStats,
     clearCache,
-    invalidateAlbumCache
+    invalidateAlbumCache,
+    fetchCoverArtCandidates,
+    applyCoverArt,
+    fetchMetadataCandidates,
+    startPolling,
+    stopPolling
   }
 })
