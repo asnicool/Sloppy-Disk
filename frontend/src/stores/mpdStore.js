@@ -436,6 +436,104 @@ export const useMpdStore = defineStore('mpd', () => {
     }
   }
 
+  const addTracks = async (uris, mode = 'append') => {
+    try {
+      // Get current state for Play Next calculation
+      await fetchPlaylist()
+      const startLength = playlist.value.length
+      const currentPos = playlistCurrentPos.value
+
+      // Add all tracks
+      // Note: This is sequential to ensure order. Ideally backend should support batch add.
+      for (const uri of uris) {
+        await axios.post(`${API_BASE}/playlist/add/${encodeURIComponent(uri)}`)
+      }
+
+      await fetchPlaylist()
+      
+      if (mode === 'append') {
+        return // Done
+      }
+
+      const newLength = playlist.value.length
+      const addedCount = newLength - startLength
+
+      if (addedCount === 0) return
+
+      if (mode === 'next') {
+        // Move added tracks to after current song
+        // Added tracks are at [startLength, ..., newLength - 1]
+        // Target is currentPos + 1
+        let target = currentPos + 1
+        
+        // We need to move them one by one. 
+        // Note: Moving an item shifts indices.
+        // If we move the last item to target, it shifts everything down.
+        // Let's iterate and move each added track to target + i
+        
+        // Strategy:
+        // We have tracks at the end.
+        // Move the first added track (at startLength) to target.
+        // Now the second added track is at startLength + 1? No, it shifted?
+        // Wait, if startLength=100, target=5.
+        // Move 100 -> 5. 100 is now at 5. Old 5 is at 5? No, old 5 is at 4? Wait.
+        // Insert AT target.
+        // If I move 100 to 5. Item at 5 shifts to 6.
+        // So effectively, I want to move startLength to target.
+        // Then startLength + 1 (which is now at startLength + 1 because we inserted before it? No.)
+        // Let's look at indexes.
+        // [A, B, C ... X, Y, Z] (Length L)
+        // Add [1, 2]. -> [A..Z, 1, 2]. (1 at L, 2 at L+1).
+        // Move 1 (from L) to 5. -> [A..4, 1, 5..Z, 2].
+        // Now 2 is at L+1.
+        // Move 2 (from L+1) to 6. -> [A..4, 1, 2, 5..Z].
+        // So yes, I can just move the calculated indices.
+        
+        // However, we must be careful if target > startLength (e.g. playing near end).
+        // If playing at 99 (of 100). Add 2 -> 102.
+        // Target 100.
+        // Move 100 to 100? No-op.
+        // Move 101 to 101? No-op.
+        // It works naturally.
+
+        for (let i = 0; i < addedCount; i++) {
+           // The track to move is always at startLength + i (initially).
+           // BUT, after moving previous tracks, does it shift?
+           // If we move from L to T (T < L).
+           // Everything from T to L-1 shifts +1.
+           // L+1 shifts? No. L+1 stays at L+1?
+           // Actually, if we use IDs it's easier, but we use Pos.
+           
+           // Let's try separate moves.
+           // We are moving `startLength + i` to `target + i`.
+            
+           // Example: [0, 1, 2, 3]. Curr=1. Target=2.
+           // Add [A, B]. -> [0, 1, 2, 3, A, B]. (A at 4, B at 5).
+           // Move A (4) to 2.
+           // Result: [0, 1, A, 2, 3, B]. (2->3, 3->4, B->5).
+           // B is still at 5.
+           // Move B (5) to 3.
+           // Result: [0, 1, A, B, 2, 3].
+           // DONE.
+           
+           // So yes, `move startLength + i` to `target + i` works IF target <= startLength.
+           // IF target > startLength (impossible if adding to end, unless startLength IS target).
+           
+           await axios.post(`${API_BASE}/playlist/move`, { from: startLength + i, to: target + i })
+        }
+      } else if (mode === 'play') {
+          // Play the first added track.
+          // It is at startLength.
+          await playTrack(startLength)
+      }
+      
+      await fetchPlaylist()
+    } catch (error) {
+      console.error('Add tracks failed:', error)
+      throw error
+    }
+  }
+
   const playTrack = async (pos) => {
     try {
       await axios.post(`${API_BASE}/play/${pos}`)
@@ -645,6 +743,7 @@ export const useMpdStore = defineStore('mpd', () => {
     fetchPlaylist,
     moveTrack,
     moveAlbum,
+    addTracks,
     playTrack,
     getConfig,
     updateConfig,
