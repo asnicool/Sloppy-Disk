@@ -10,15 +10,38 @@
   >
     <template #item="{ element }">
       <div 
-        class="flex items-center gap-2 p-2 bg-neutral-800/50 hover:bg-neutral-700/80 rounded cursor-grab active:cursor-grabbing group"
+        class="flex items-center gap-2 p-2 rounded cursor-grab active:cursor-grabbing group transition-colors"
+        :class="getTrackClass(element)"
         @dblclick="playTrack(element.pos)"
       >
-        <span class="text-xs text-neutral-500 w-6 text-center">{{ element.track || '-' }}</span>
-        <div class="flex-1 min-w-0">
-          <div class="text-sm text-neutral-200 truncate">{{ element.title || 'Unknown Title' }}</div>
-          <!-- Optional: Show artist if it differs from album artist? For now keep simple -->
+        <!-- Track Number / Playing Indicator -->
+        <div class="w-6 flex items-center justify-center">
+          <span v-if="element.isCurrentTrack" class="text-green-400">
+            <svg class="w-4 h-4 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+            </svg>
+          </span>
+          <span v-else class="text-xs" :class="element.isPlayed ? 'text-neutral-600' : 'text-neutral-500'">
+            {{ element.track || '-' }}
+          </span>
         </div>
-        <div class="text-xs text-neutral-500 font-mono">{{ formatTime(element.duration) }}</div>
+        
+        <!-- Track Title -->
+        <div class="flex-1 min-w-0">
+          <div 
+            class="text-sm truncate"
+            :class="element.isCurrentTrack ? 'text-green-400 font-medium' : (element.isPlayed ? 'text-neutral-500' : 'text-neutral-200')"
+          >
+            {{ element.title || 'Unknown Title' }}
+          </div>
+        </div>
+        
+        <!-- Unplayed Indicator Dot -->
+        <div 
+          v-if="!element.isPlayed && !element.isCurrentTrack" 
+          class="w-1.5 h-1.5 rounded-full bg-neutral-600"
+          title="Not played yet"
+        ></div>
       </div>
     </template>
   </draggable>
@@ -37,17 +60,24 @@ const props = defineProps({
   groupStartPos: {
     type: Number,
     required: true
+  },
+  currentPos: {
+    type: Number,
+    default: -1
   }
 })
 
 const emit = defineEmits(['track-move', 'track-remove'])
 const mpdStore = useMpdStore()
 
-const formatTime = (seconds) => {
-  if (!seconds || isNaN(seconds)) return '0:00'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
+const getTrackClass = (element) => {
+  if (element.isCurrentTrack) {
+    return 'bg-green-500/10 hover:bg-green-500/20 border border-green-500/30'
+  }
+  if (element.isPlayed) {
+    return 'bg-neutral-800/30 hover:bg-neutral-800/50'
+  }
+  return 'bg-neutral-800/50 hover:bg-neutral-700/80'
 }
 
 const playTrack = (pos) => {
@@ -55,14 +85,8 @@ const playTrack = (pos) => {
 }
 
 const handleChange = (event) => {
-  // We only care about user interactions that result in a move
-  // 'moved': sorted within same list
-  // 'added': dropped from another list
-  
   if (event.moved) {
     const { element, newIndex } = event.moved
-    // Calculate global target position
-    // Since 'tracks' is just this group, the global index is groupStartPos + newIndex
     const globalTarget = props.groupStartPos + newIndex
     emit('track-move', { from: element.pos, to: globalTarget })
   } 

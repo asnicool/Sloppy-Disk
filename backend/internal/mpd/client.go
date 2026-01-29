@@ -659,8 +659,22 @@ func ParseResponse(response string) map[string]string {
 }
 
 func parseInt(s string) int {
+	// Handle empty string case - this is expected when MPD doesn't provide duration
+	if s == "" {
+		return 0
+	}
+	
 	var i int
-	fmt.Sscanf(s, "%d", &i)
+	n, err := fmt.Sscanf(s, "%d", &i)
+	if err != nil || n != 1 {
+		// Try parsing as float (MPD may return duration as float)
+		var f float64
+		n, err := fmt.Sscanf(s, "%f", &f)
+		if err != nil || n != 1 {
+			return 0
+		}
+		return int(f)
+	}
 	return i
 }
 
