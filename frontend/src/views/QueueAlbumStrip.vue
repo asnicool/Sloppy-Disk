@@ -1,12 +1,12 @@
 <template>
   <div class="h-full flex flex-col">
-    <!-- Top Handle for iPhone Scrolling -->
-    <div class="flex-none h-8 flex items-center justify-center touch-handle">
+    <!-- Top Handle for iPhone Scrolling (visual indicator only, scrolling happens in draggable area) -->
+    <div class="flex-none h-6 flex items-center justify-center">
       <div class="w-16 h-1 bg-neutral-700 rounded-full"></div>
     </div>
 
     <!-- Collapse/Expand Controls -->
-    <div class="flex-none px-4 pb-2 flex items-center justify-between">
+    <div class="flex-none px-4 pb-2 flex items-center justify-between z-10">
       <button 
         @click="toggleCompact"
         class="flex items-center gap-2 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-sm text-neutral-300 transition-colors"
@@ -27,21 +27,25 @@
       v-model="groupedPlaylist" 
       item-key="id"
       group="albums"
-      direction="horizontal"
+      direction="both"
       handle=".album-handle"
-      class="flex-1 flex overflow-x-auto overflow-y-hidden gap-4 px-4 pb-4 scrollbar-thin scrollbar-thumb-neutral-700 scrollbar-track-transparent"
+      class="flex-1 flex overflow-x-auto overflow-y-hidden gap-4 px-4 pb-4 pt-8 scrollbar-thin scrollbar-thumb-neutral-700 scrollbar-track-transparent touch-pad"
       ghost-class="opacity-50"
+      :class="{ 'flex-wrap content-start': isCompact, 'overflow-x-auto overflow-y-hidden': !isCompact }"
       @change="handleAlbumChange"
     >
       <template #item="{ element: group }">
         <div 
-          class="flex-shrink-0 w-40 flex flex-col bg-neutral-900 rounded-xl overflow-hidden border border-neutral-800 shadow-xl group-card transition-all duration-300"
-          :class="{ 'h-auto': isCompact, 'h-full': !isCompact }"
+          class="flex-shrink-0 flex flex-col bg-neutral-900 rounded-xl overflow-hidden border border-neutral-800 shadow-xl group-card transition-all duration-300"
+          :class="[
+            isCompact ? 'w-32 h-auto' : 'w-40 h-full',
+            isCompact ? 'mb-4' : ''
+          ]"
         >
           <!-- Album Header (Draggable Handle) -->
           <div 
             class="album-handle relative w-full cursor-grab active:cursor-grabbing"
-            :class="isCompact ? 'h-12' : 'h-40'"
+            :class="isCompact ? 'h-24' : 'h-40'"
           >
             <img 
               v-if="group.coverUrl" 
@@ -63,7 +67,7 @@
             </div>
             
             <!-- Compact Header Info -->
-            <div v-else class="absolute inset-0 flex items-center px-3 bg-gradient-to-r from-black/60 to-transparent">
+            <div v-if="isCompact" class="absolute inset-0 flex items-center px-3 bg-gradient-to-r from-black/60 to-transparent">
               <div class="flex-1 min-w-0">
                 <h3 class="font-bold text-white truncate text-sm">{{ group.album || 'Unknown Album' }}</h3>
                 <p class="text-xs text-neutral-300 truncate">{{ group.artist || 'Unknown Artist' }}</p>
@@ -154,7 +158,6 @@ const groupedPlaylist = computed({
         }
       }
       
-      // Mark if this group contains the current track
       if (isCurrentTrack) {
         currentGroup.hasCurrentTrack = true
       }
@@ -180,7 +183,6 @@ const handleAlbumChange = (event) => {
     const groups = groupedPlaylist.value
     const movedGroup = groups[oldIndex]
     
-    // Simulate the move to calculate target position
     const tempGroups = [...groups]
     const [removed] = tempGroups.splice(oldIndex, 1)
     tempGroups.splice(newIndex, 0, removed)
@@ -222,9 +224,10 @@ const removeAlbum = (group) => {
   border-radius: 4px;
 }
 
-/* Top handle for iPhone scrolling */
-.touch-handle {
-  -webkit-tap-highlight-color: transparent;
+/* Enable touch scrolling */
+.touch-pad {
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .group-card {
