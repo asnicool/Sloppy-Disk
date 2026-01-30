@@ -702,6 +702,27 @@ export const useMpdStore = defineStore('mpd', () => {
     }
   }
 
+  // Sync functions
+  const getSyncStatus = async () => {
+    try {
+      const response = await axios.get(`${API_BASE}/sync/status`)
+      return response.data
+    } catch (error) {
+      console.error('Get sync status failed:', error)
+      throw error
+    }
+  }
+
+  const startSync = async () => {
+    try {
+      const response = await axios.post(`${API_BASE}/sync/start`)
+      return response.data
+    } catch (error) {
+      console.error('Start sync failed:', error)
+      throw error
+    }
+  }
+
   return {
     // State
     status,
@@ -754,6 +775,8 @@ export const useMpdStore = defineStore('mpd', () => {
     applyCoverArt,
     fetchMetadataCandidates,
     startPolling,
-    stopPolling
+    stopPolling,
+    getSyncStatus,
+    startSync
   }
 })
