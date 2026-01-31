@@ -96,11 +96,6 @@
         </p>
       </div>
 
-      <!-- Metadata Status Badge -->
-      <div class="mt-2 mb-1 flex items-center gap-2">
-        <MetadataStatusBadge :album="{ name: album, artist, date, genre, coverUrl }" class="text-[10px]" />
-      </div>
-
       <!-- Immediate Metadata (from props) -->
       <div v-if="date || genre" class="flex flex-wrap items-center gap-2">
         <span
@@ -124,9 +119,16 @@
       <div v-if="fullDetails && (fullDetails.album.trackCount || fullDetails.album.duration)" class="mt-2 flex flex-wrap items-center gap-2 animate-in fade-in slide-in-from-bottom-1 duration-500">
         <button 
           @click.stop="navigateToDetails"
-          class="px-2 py-0.5 bg-primary-500/20 text-[10px] text-primary-400 rounded-md border border-primary-500/30 hover:bg-primary-500/40 hover:text-white transition-all flex items-center font-bold"
+          class="px-2 py-0.5 bg-primary-500/20 text-[10px] text-primary-400 rounded-md border border-primary-500/30 hover:bg-primary-500/40 hover:text-white transition-all flex items-center font-bold gap-1"
         >
           #{{ fullDetails.album.trackCount || '?' }} / {{ formatDuration(fullDetails.album.duration) }}
+          <button 
+            @click.stop="openMetadataSearch"
+            class="hover:scale-110 transition-transform"
+            title="Click to find metadata"
+          >
+            <MetadataStatusBadge :album="{ name: album, artist, date, genre, coverUrl }" />
+          </button>
         </button>
       </div>
 
@@ -169,6 +171,8 @@ const props = defineProps({
     default: null
   }
 })
+
+const emit = defineEmits(['open-metadata-search'])
 
 const router = useRouter()
 const mpdStore = useMpdStore()
@@ -346,6 +350,14 @@ const navigateToDetails = () => {
       artist: props.artist, 
       album: props.album 
     } 
+  })
+}
+
+const openMetadataSearch = () => {
+  // Emit event to open metadata search modal with album and artist pre-filled
+  emit('open-metadata-search', {
+    artist: props.artist,
+    album: props.album
   })
 }
 

@@ -47,8 +47,21 @@
         :date="album.date"
         :genre="album.genre"
         :album-details="album"
+        @open-metadata-search="handleOpenMetadataSearch"
       />
     </div>
+
+    <!-- Metadata Search Modal -->
+    <MetadataSearchModal
+      v-if="showMetadataModal"
+      :is-open="showMetadataModal"
+      :initial-artist="selectedArtist"
+      :initial-album="selectedAlbum"
+      :album-path="selectedAlbumPath"
+      :key="selectedArtist + selectedAlbum"
+      @close="showMetadataModal = false"
+      @applied="handleMetadataApplied"
+    />
 
     <!-- Pagination Controls -->
     <div v-if="!loading && albums.length > 0 && sortMode !== 'random'" class="flex justify-center items-center space-x-4 mt-6">
@@ -75,8 +88,15 @@
 import { ref, onMounted, watch } from 'vue'
 import { useMpdStore } from '@/stores/mpd'
 import AlbumCard from '@/components/AlbumCard.vue'
+import MetadataSearchModal from '@/components/MetadataSearchModal.vue'
 
 const mpdStore = useMpdStore()
+
+// Metadata Search Modal State
+const showMetadataModal = ref(false)
+const selectedArtist = ref('')
+const selectedAlbum = ref('')
+const selectedAlbumPath = ref('')
 const albums = ref([])
 const loading = ref(true)
 const currentPage = ref(1)
@@ -136,6 +156,43 @@ watch(sortMode, async () => {
   await loadAlbums()
 })
 
+// Metadata Search Modal Handlers
+const handleOpenMetadataSearch = ({ artist, album }) => {
+  console.log('[AlbumsView] handleOpenMetadataSearch called with:', { artist, album })
+  console.log('[AlbumsView] Albums in list:', albums.value.length)
+  
+  // Find the album in the list to get its path
+  const albumData = albums.value.find(a => a.artist === artist && a.album === album)
+  console.log('[AlbumsView] Found album data:', albumData)
+  
+  if (albumData && albumData.tracks && albumData.tracks.length > 0) {
+    // Get album path from first track
+    selectedAlbumPath.value = albumData.tracks[0].path.split('/').slice(0, -1).join('/')
+    console.log('[AlbumsView] Album path set:', selectedAlbumPath.value)
+  } else {
+    selectedAlbumPath.value = ''
+    console.log('[AlbumsView] No album path available')
+  }
+  
+  selectedArtist.value = artist
+  selectedAlbum.value = album
+  console.log('[AlbumsView] Setting modal to open with artist:', artist, 'album:', album)
+  showModalWithDelay()
+}
+
+const showModalWithDelay = () => {
+  // Use setTimeout to ensure Vue has time to update refs before opening modal
+  setTimeout(() => {
+    showMetadataModal.value = true
+    console.log('[AlbumsView] Modal should now be open')
+  }, 50)
+}
+
+const handleMetadataApplied = (result) => {
+  console.log('Metadata applied:', result)
+  // Refresh the album data to show updated metadata
+  loadAlbums()
+}
 
 onMounted(async () => {
   await loadAlbums()

@@ -21,18 +21,18 @@
           <!-- Search Form -->
           <div class="mb-4 flex gap-2">
             <input
-              v-model="searchArtist"
+              v-model="displayArtist"
               placeholder="Artist"
               class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-400"
             />
             <input
-              v-model="searchAlbum"
+              v-model="displayAlbum"
               placeholder="Album"
               class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-400"
             />
             <button
               @click="handleSearch"
-              :disabled="loading || !searchArtist || !searchAlbum"
+              :disabled="loading || !displayArtist || !displayAlbum"
               class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
             >
               {{ loading ? 'Searching...' : 'Search' }}
@@ -41,15 +41,19 @@
 
           <!-- Provider Filter -->
           <div class="mb-4 flex gap-2 flex-wrap">
-            <label v-for="provider in providers" :key="provider" class="flex items-center gap-1 text-sm text-gray-300">
-              <input
-                type="checkbox"
-                :value="provider"
-                v-model="selectedProviders"
-                class="rounded bg-gray-800 border-gray-700"
-              />
+            <button
+              v-for="provider in providers"
+              :key="provider"
+              @click="toggleProvider(provider)"
+              :class="[
+                'px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200',
+                isProviderSelected(provider)
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+              ]"
+            >
               {{ provider }}
-            </label>
+            </button>
           </div>
 
           <!-- Error -->
@@ -149,7 +153,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick, computed } from 'vue'
 import { useMetadata } from '../composables/useMetadata'
 
 const props = defineProps({
@@ -183,18 +187,32 @@ const selectedCoverArt = ref(null)
 const applying = ref(false)
 const searched = ref(false)
 
+// Display value for inputs
+const displayArtist = computed({
+  get: () => searchArtist.value || props.initialArtist,
+  set: (val) => { searchArtist.value = val }
+})
+
+const displayAlbum = computed({
+  get: () => searchAlbum.value || props.initialAlbum,
+  set: (val) => { searchAlbum.value = val }
+})
+
 const handleSearch = async () => {
-  if (!searchArtist.value || !searchAlbum.value) return
+  const artist = displayArtist.value
+  const album = displayAlbum.value
+  
+  if (!artist || !album) return
   
   searched.value = true
   clearSelection()
   coverArtOptions.value = []
   selectedCoverArt.value = null
   
-  await searchMetadata(searchArtist.value, searchAlbum.value, selectedProviders.value)
+  await searchMetadata(artist, album, selectedProviders.value)
   
   // Also search for cover art
-  coverArtOptions.value = await searchCoverArt(searchArtist.value, searchAlbum.value)
+  coverArtOptions.value = await searchCoverArt(artist, album)
 }
 
 const selectCandidate = async (candidate) => {
@@ -226,11 +244,35 @@ const handleApply = async () => {
   }
 }
 
-// Initialize with props
+const toggleProvider = (provider) => {
+  const index = selectedProviders.value.indexOf(provider)
+  if (index === -1) {
+    selectedProviders.value.push(provider)
+  } else {
+    selectedProviders.value.splice(index, 1)
+  }
+}
+
+const isProviderSelected = (provider) => {
+  return selectedProviders.value.includes(provider)
+}
+
+// Watch props to log changes
+watch(() => props.initialArtist, (val) => {
+  console.log('[MetadataSearchModal] initialArtist changed to:', val)
+}, { immediate: true })
+
+watch(() => props.initialAlbum, (val) => {
+  console.log('[MetadataSearchModal] initialAlbum changed to:', val)
+}, { immediate: true })
+
+// Initialize with props - clear user edits when modal opens
 watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
-    searchArtist.value = props.initialArtist || ''
-    searchAlbum.value = props.initialAlbum || ''
+    console.log('[MetadataSearchModal] Opening with artist:', props.initialArtist, 'album:', props.initialAlbum)
+    // Clear any previous user edits
+    searchArtist.value = ''
+    searchAlbum.value = ''
     searched.value = false
     clearSelection()
   }
