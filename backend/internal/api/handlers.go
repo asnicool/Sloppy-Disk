@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -435,19 +436,31 @@ func SearchMetadata(w http.ResponseWriter, r *http.Request) {
 	album := r.URL.Query().Get("album")
 	providersParam := r.URL.Query().Get("providers")
 
+	log.Printf("[METADATA HANDLER] SearchMetadata called")
+	log.Printf("[METADATA HANDLER]   Artist: '%s'", artist)
+	log.Printf("[METADATA HANDLER]   Album: '%s'", album)
+	log.Printf("[METADATA HANDLER]   Providers param: '%s'", providersParam)
+
 	// Parse providers list
 	var providers []string
 	if providersParam != "" {
 		providers = strings.Split(providersParam, ",")
+		log.Printf("[METADATA HANDLER]   Parsed providers: %v", providers)
+	} else {
+		log.Printf("[METADATA HANDLER]   No providers specified, will use all available providers")
 	}
 
 	// Use aggregator for multi-provider search
+	log.Printf("[METADATA HANDLER] Creating aggregator and starting search...")
 	aggregator := metadata.NewAggregator()
 	candidates, err := aggregator.Search(r.Context(), artist, album, providers)
 	if err != nil {
+		log.Printf("[METADATA HANDLER] Search failed with error: %v", err)
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	log.Printf("[METADATA HANDLER] Search completed successfully. Returning %d candidates", len(candidates))
 	SendJSON(w, models.APIResponse{Success: true, Data: candidates})
 }
 
@@ -455,21 +468,32 @@ func GetMetadataDetails(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("source")
 	externalID := r.URL.Query().Get("externalId")
 
+	log.Printf("[METADATA DETAILS] GetMetadataDetails called")
+	log.Printf("[METADATA DETAILS]   Source: '%s'", source)
+	log.Printf("[METADATA DETAILS]   ExternalID: '%s'", externalID)
+
 	if source == "" || externalID == "" {
+		log.Printf("[METADATA DETAILS] Error: source and externalId are required")
 		SendError(w, http.StatusBadRequest, "source and externalId are required")
 		return
 	}
 
+	log.Printf("[METADATA DETAILS] Creating aggregator and fetching details...")
 	aggregator := metadata.NewAggregator()
 	details, err := aggregator.GetReleaseDetails(r.Context(), source, externalID)
 	if err != nil {
+		log.Printf("[METADATA DETAILS] Error fetching details: %v", err)
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if details == nil {
+		log.Printf("[METADATA DETAILS] Error: Release not found")
 		SendError(w, http.StatusNotFound, "Release not found")
 		return
 	}
+	
+	log.Printf("[METADATA DETAILS] Successfully fetched details for '%s - %s' (%s)", details.Artist, details.Album, details.Year)
+	log.Printf("[METADATA DETAILS]   Tracks: %d", len(details.Tracks))
 	SendJSON(w, models.APIResponse{Success: true, Data: details})
 }
 

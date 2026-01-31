@@ -93,12 +93,11 @@
     <!-- Tracks List -->
     <div class="bg-neutral-800 rounded-lg overflow-hidden">
       <table class="w-full text-left">
-        <thead class="bg-neutral-700 text-neutral-400 text-sm uppercase">
+        <thead class="bg-neutral-700 text-neutral-400 text-xs uppercase">
           <tr>
-            <th class="px-6 py-3 font-medium w-16">#</th>
-            <th class="px-6 py-3 font-medium">Title</th>
-            <th class="px-6 py-3 font-medium">Duration</th>
-            <th class="px-6 py-3 font-medium w-10"></th>
+            <th class="px-4 py-2 font-medium w-12">#</th>
+            <th class="px-4 py-2 font-medium w-16 text-right">Time</th>
+            <th class="px-4 py-2 font-medium">Title</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-neutral-700 select-none">
@@ -112,10 +111,10 @@
                 hasSelection && !isTrackSelected(track) ? 'text-neutral-500' : 'text-neutral-300'
             ]"
           >
-            <td class="px-6 py-4 relative group-hover:text-white">
-                <div class="relative w-8 h-8 flex items-center justify-center">
+            <td class="px-4 py-2 relative group-hover:text-white">
+                <div class="relative w-6 h-6 flex items-center justify-center">
                     <span 
-                        class="absolute transition-opacity duration-200"
+                        class="text-sm transition-opacity duration-200"
                         :class="[
                             hasSelection && !isTrackSelected(track) ? 'opacity-50' : 'opacity-100',
                             isTrackSelected(track) ? 'opacity-0' : 'opacity-100'
@@ -132,18 +131,9 @@
                     </div>
                 </div>
             </td>
-            <td class="px-6 py-4" :class="{ 'text-white': !hasSelection || isTrackSelected(track) }">{{ track.title }}</td>
-            <td class="px-6 py-4" :class="{ 'opacity-50': hasSelection && !isTrackSelected(track) }">{{ formatDuration(track.duration) }}</td>
-            <td class="px-6 py-4 text-right">
-              <button 
-                @click.stop="playSingleTrack(track)" 
-                class="text-neutral-400 hover:text-white p-2 rounded-full hover:bg-neutral-600 transition-colors opacity-0 group-hover:opacity-100"
-                title="Play this track now"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-1.664a1 1 0 000-1.664l-3-1.664z" clip-rule="evenodd" />
-                </svg>
-              </button>
+            <td class="px-4 py-2 text-right text-sm" :class="{ 'opacity-50': hasSelection && !isTrackSelected(track) }">{{ formatDuration(track.duration) }}</td>
+            <td class="px-4 py-2 text-sm" :class="{ 'text-white': !hasSelection || isTrackSelected(track) }">
+              <div class="truncate" :title="track.title">{{ track.title }}</div>
             </td>
           </tr>
         </tbody>

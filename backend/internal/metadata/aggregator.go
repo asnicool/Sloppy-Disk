@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"context"
+	"log"
 	"sort"
 	"strings"
 	"sync"
@@ -45,6 +46,12 @@ func (a *Aggregator) AddProvider(p Provider) {
 
 // Search searches all providers in parallel and aggregates results
 func (a *Aggregator) Search(ctx context.Context, artist, album string, providers []string) ([]models.MetadataCandidate, error) {
+	log.Printf("[METADATA SEARCH] Starting search - Artist: '%s', Album: '%s'", artist, album)
+	log.Printf("[METADATA SEARCH] Available providers: %d", len(a.providers))
+	for _, p := range a.providers {
+		log.Printf("[METADATA SEARCH]   - %s", p.Name())
+	}
+
 	// Filter providers
 	var activeProviders []Provider
 	providerSet := make(map[string]bool)
@@ -58,7 +65,13 @@ func (a *Aggregator) Search(ctx context.Context, artist, album string, providers
 		}
 	}
 
+	log.Printf("[METADATA SEARCH] Active providers after filtering: %d", len(activeProviders))
+	for _, p := range activeProviders {
+		log.Printf("[METADATA SEARCH]   - %s", p.Name())
+	}
+
 	if len(activeProviders) == 0 {
+		log.Printf("[METADATA SEARCH] No active providers, returning empty results")
 		return []models.MetadataCandidate{}, nil
 	}
 
@@ -67,21 +80,32 @@ func (a *Aggregator) Search(ctx context.Context, artist, album string, providers
 	mu := sync.Mutex{}
 	results := make([]models.MetadataCandidate, 0)
 
+	log.Printf("[METADATA SEARCH] Starting parallel search across %d providers", len(activeProviders))
+	
 	for _, p := range activeProviders {
 		wg.Add(1)
 		go func(provider Provider) {
 			defer wg.Done()
 
+			log.Printf("[METADATA SEARCH] [%s] Starting search", provider.Name())
 			candidates, err := provider.Search(artist, album)
 			if err != nil {
-				// Log error but continue
+				log.Printf("[METADATA SEARCH] [%s] Error: %v", provider.Name(), err)
 				return
+			}
+
+			log.Printf("[METADATA SEARCH] [%s] Found %d candidates", provider.Name(), len(candidates))
+			for i, c := range candidates {
+				log.Printf("[METADATA SEARCH] [%s]   Candidate %d: Artist='%s', Album='%s', Year='%s', ExternalID='%s'", 
+					provider.Name(), i, c.Artist, c.Album, c.Year, c.ExternalID)
 			}
 
 			mu.Lock()
 			for i := range candidates {
 				// Calculate confidence score
 				candidates[i].Confidence = calculateConfidence(candidates[i], artist, album)
+				log.Printf("[METADATA SEARCH] [%s]   Candidate %d confidence: %.2f", 
+					provider.Name(), i, candidates[i].Confidence)
 			}
 			results = append(results, candidates...)
 			mu.Unlock()
@@ -89,14 +113,23 @@ func (a *Aggregator) Search(ctx context.Context, artist, album string, providers
 	}
 
 	wg.Wait()
+	log.Printf("[METADATA SEARCH] All providers completed. Total candidates before deduplication: %d", len(results))
 
 	// Deduplicate by external ID
 	results = deduplicate(results)
+	log.Printf("[METADATA SEARCH] After deduplication: %d candidates", len(results))
 
 	// Sort by confidence (highest first)
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Confidence > results[j].Confidence
 	})
+
+	// Log final results
+	log.Printf("[METADATA SEARCH] Final results (sorted by confidence):")
+	for i, r := range results {
+		log.Printf("[METADATA SEARCH]   %d. [%.2f] %s - %s (%s) from %s", 
+			i+1, r.Confidence, r.Artist, r.Album, r.Year, r.Source)
+	}
 
 	return results, nil
 }
@@ -146,11 +179,15 @@ func calculateConfidence(candidate models.MetadataCandidate, queryArtist, queryA
 	var score float64 = 50 // Base score
 
 	// Artist similarity (0-30 points)
-	artistScore := stringSimilarity(normalizeString(candidate.Artist), normalizeString(queryArtist))
+	normalizedCandidateArtist := normalizeString(candidate.Artist)
+	normalizedQueryArtist := normalizeString(queryArtist)
+	artistScore := stringSimilarity(normalizedCandidateArtist, normalizedQueryArtist)
 	score += artistScore * 30
 
 	// Album similarity (0-30 points)
-	albumScore := stringSimilarity(normalizeString(candidate.Album), normalizeString(queryAlbum))
+	normalizedCandidateAlbum := normalizeString(candidate.Album)
+	normalizedQueryAlbum := normalizeString(queryAlbum)
+	albumScore := stringSimilarity(normalizedCandidateAlbum, normalizedQueryAlbum)
 	score += albumScore * 30
 
 	// Source reliability bonus (0-10 points)
@@ -162,6 +199,12 @@ func calculateConfidence(candidate models.MetadataCandidate, queryArtist, queryA
 	default:
 		score += 5
 	}
+
+	log.Printf("[CONFIDENCE] Artist: '%s' vs '%s' = %.4f (%.1f pts)", 
+		normalizedCandidateArtist, normalizedQueryArtist, artistScore, artistScore*30)
+	log.Printf("[CONFIDENCE] Album: '%s' vs '%s' = %.4f (%.1f pts)", 
+		normalizedCandidateAlbum, normalizedQueryAlbum, albumScore, albumScore*30)
+	log.Printf("[CONFIDENCE] Source bonus: %s = %.1f pts", candidate.Source, score-50-artistScore*30-albumScore*30)
 
 	return score
 }

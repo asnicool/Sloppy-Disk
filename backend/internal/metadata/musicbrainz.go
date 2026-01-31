@@ -3,6 +3,7 @@ package metadata
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -40,9 +41,13 @@ func (p *MusicBrainzProvider) Name() string {
 
 // Search searches for releases on MusicBrainz
 func (p *MusicBrainzProvider) Search(artist, album string) ([]models.MetadataCandidate, error) {
+	log.Printf("[MUSICBRAINZ] Search called with artist='%s', album='%s'", artist, album)
+	
 	// Rate limiting
 	if time.Since(p.lastReq) < musicBrainzRateLimit {
-		time.Sleep(musicBrainzRateLimit - time.Since(p.lastReq))
+		sleepTime := musicBrainzRateLimit - time.Since(p.lastReq)
+		log.Printf("[MUSICBRAINZ] Rate limiting: sleeping for %v", sleepTime)
+		time.Sleep(sleepTime)
 	}
 
 	query := fmt.Sprintf(`artist:"%s" AND release:"%s"`, artist, album)
@@ -53,8 +58,11 @@ func (p *MusicBrainzProvider) Search(artist, album string) ([]models.MetadataCan
 		"fmt":    {"json"},
 	}
 
+	log.Printf("[MUSICBRAINZ] Query URL params: query='%s', type='%s', limit='%s'", query, params.Get("type"), params.Get("limit"))
+
 	req, err := p.newRequest("GET", "/release-group/", params)
 	if err != nil {
+		log.Printf("[MUSICBRAINZ] Error creating request: %v", err)
 		return nil, NewProviderError("MusicBrainz", err)
 	}
 
@@ -76,23 +84,41 @@ func (p *MusicBrainzProvider) Search(artist, album string) ([]models.MetadataCan
 		Count int `json:"count"`
 	}
 
+	log.Printf("[MUSICBRAINZ] Sending request to: %s", req.URL.String())
 	p.lastReq = time.Now()
 	resp, err := p.client.Do(req)
 	if err != nil {
+		log.Printf("[MUSICBRAINZ] HTTP request failed: %v", err)
 		return nil, NewProviderError("MusicBrainz", err)
 	}
 	defer resp.Body.Close()
 
+	log.Printf("[MUSICBRAINZ] Response status: %d %s", resp.StatusCode, resp.Status)
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("[MUSICBRAINZ] Non-OK status code received")
 		return nil, NewProviderError("MusicBrainz", fmt.Errorf("API returned status %d", resp.StatusCode))
 	}
 
+	log.Printf("[MUSICBRAINZ] Parsing JSON response...")
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		log.Printf("[MUSICBRAINZ] JSON decode error: %v", err)
 		return nil, NewProviderError("MusicBrainz", err)
 	}
 
+	log.Printf("[MUSICBRAINZ] API returned %d release groups (count=%d)", len(result.ReleaseGroups), result.Count)
+
 	var candidates []models.MetadataCandidate
-	for _, rg := range result.ReleaseGroups {
+	for i, rg := range result.ReleaseGroups {
+		log.Printf("[MUSICBRAINZ] Release group %d: Title='%s', Date='%s', ID='%s'", i, rg.Title, rg.FirstReleaseDate, rg.ID)
+		if len(rg.ArtistCredits) > 0 {
+			log.Printf("[MUSICBRAINZ]   Artist credits: %d artists", len(rg.ArtistCredits))
+			for j, ac := range rg.ArtistCredits {
+				log.Printf("[MUSICBRAINZ]     Artist %d: '%s' (ID: %s)", j, ac.Artist.Name, ac.Artist.ID)
+			}
+		}
+		if len(rg.Releases) > 0 {
+			log.Printf("[MUSICBRAINZ]   Releases: %d available", len(rg.Releases))
+		}
 		artistName := artist
 		if len(rg.ArtistCredits) > 0 {
 			artistName = rg.ArtistCredits[0].Artist.Name
@@ -103,11 +129,20 @@ func (p *MusicBrainzProvider) Search(artist, album string) ([]models.MetadataCan
 			releaseID = rg.Releases[0].ID
 		}
 
+		// Handle potential panic from [:4] on short date strings
+		year := "????"
+		if len(rg.FirstReleaseDate) >= 4 {
+			year = rg.FirstReleaseDate[:4]
+		}
+
+		log.Printf("[MUSICBRAINZ] Creating candidate: Artist='%s', Album='%s', Year='%s', ReleaseID='%s'", 
+			artistName, rg.Title, year, releaseID)
+
 		candidates = append(candidates, models.MetadataCandidate{
 			Source:     "MusicBrainz",
 			Artist:     artistName,
 			Album:      rg.Title,
-			Year:       rg.FirstReleaseDate[:4], // Take first 4 chars for year
+			Year:       year,
 			ExternalID: rg.ID,
 			Metadata: map[string]interface{}{
 				"releaseGroupID": rg.ID,
@@ -116,37 +151,96 @@ func (p *MusicBrainzProvider) Search(artist, album string) ([]models.MetadataCan
 		})
 	}
 
+	log.Printf("[MUSICBRAINZ] Returning %d candidates", len(candidates))
 	return candidates, nil
 }
 
 // GetReleaseDetails fetches detailed metadata for a MusicBrainz release
 func (p *MusicBrainzProvider) GetReleaseDetails(externalID string) (*models.MetadataCandidate, error) {
+	log.Printf("[MUSICBRAINZ] GetReleaseDetails called with externalID='%s'", externalID)
+	
 	// Rate limiting
 	if time.Since(p.lastReq) < musicBrainzRateLimit {
-		time.Sleep(musicBrainzRateLimit - time.Since(p.lastReq))
+		sleepTime := musicBrainzRateLimit - time.Since(p.lastReq)
+		log.Printf("[MUSICBRAINZ] Rate limiting: sleeping for %v", sleepTime)
+		time.Sleep(sleepTime)
 	}
 
-	// Remove "release-group:" prefix if present
-	id := strings.TrimPrefix(externalID, "release-group:")
-
+	// The externalID is a release-group ID, but we need a release ID to get details
+	// We'll use a different approach: search for the release-group again to get a release ID
+	log.Printf("[MUSICBRAINZ] Fetching release-group to get release ID: '%s'", externalID)
+	
 	params := url.Values{
-		"inc":  {"recordings+artist-credits+release-groups"},
-		"fmt":  {"json"},
+		"fmt": {"json"},
 	}
 
-	req, err := p.newRequest("GET", "/release/"+id, params)
+	req, err := p.newRequest("GET", "/release-group/"+externalID, params)
 	if err != nil {
+		log.Printf("[MUSICBRAINZ] Error creating request for release-group: %v", err)
 		return nil, NewProviderError("MusicBrainz", err)
 	}
 
+	log.Printf("[MUSICBRAINZ] Sending request to: %s", req.URL.String())
 	p.lastReq = time.Now()
 	resp, err := p.client.Do(req)
 	if err != nil {
+		log.Printf("[MUSICBRAINZ] HTTP request failed: %v", err)
 		return nil, NewProviderError("MusicBrainz", err)
 	}
 	defer resp.Body.Close()
 
+	log.Printf("[MUSICBRAINZ] Response status: %d %s", resp.StatusCode, resp.Status)
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("[MUSICBRAINZ] Non-OK status code received when fetching release-group")
+		return nil, NewProviderError("MusicBrainz", fmt.Errorf("API returned status %d", resp.StatusCode))
+	}
+
+	var releaseGroup struct {
+		ID       string `json:"id"`
+		Title    string `json:"title"`
+		Releases []struct {
+			ID string `json:"id"`
+		} `json:"releases"`
+	}
+
+	log.Printf("[MUSICBRAINZ] Parsing JSON response...")
+	if err := json.NewDecoder(resp.Body).Decode(&releaseGroup); err != nil {
+		log.Printf("[MUSICBRAINZ] JSON decode error: %v", err)
+		return nil, NewProviderError("MusicBrainz", err)
+	}
+
+	if len(releaseGroup.Releases) == 0 {
+		log.Printf("[MUSICBRAINZ] No releases found for release-group '%s'", externalID)
+		return nil, NewProviderError("MusicBrainz", fmt.Errorf("no releases found"))
+	}
+
+	releaseID := releaseGroup.Releases[0].ID
+	log.Printf("[MUSICBRAINZ] Found release ID: '%s', now fetching release details", releaseID)
+
+	// Now fetch the actual release details
+	params = url.Values{
+		"inc":  {"recordings+artist-credits+release-groups"},
+		"fmt":  {"json"},
+	}
+
+	req, err = p.newRequest("GET", "/release/"+releaseID, params)
+	if err != nil {
+		log.Printf("[MUSICBRAINZ] Error creating request for release: %v", err)
+		return nil, NewProviderError("MusicBrainz", err)
+	}
+
+	log.Printf("[MUSICBRAINZ] Sending request to: %s", req.URL.String())
+	p.lastReq = time.Now()
+	resp, err = p.client.Do(req)
+	if err != nil {
+		log.Printf("[MUSICBRAINZ] HTTP request failed: %v", err)
+		return nil, NewProviderError("MusicBrainz", err)
+	}
+	defer resp.Body.Close()
+
+	log.Printf("[MUSICBRAINZ] Response status: %d %s", resp.StatusCode, resp.Status)
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[MUSICBRAINZ] Non-OK status code received when fetching release")
 		return nil, NewProviderError("MusicBrainz", fmt.Errorf("API returned status %d", resp.StatusCode))
 	}
 
@@ -187,9 +281,13 @@ func (p *MusicBrainzProvider) GetReleaseDetails(externalID string) (*models.Meta
 		} `json:"genres"`
 	}
 
+	log.Printf("[MUSICBRAINZ] Parsing JSON response...")
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		log.Printf("[MUSICBRAINZ] JSON decode error: %v", err)
 		return nil, NewProviderError("MusicBrainz", err)
 	}
+
+	log.Printf("[MUSICBRAINZ] Release details: Title='%s', Date='%s', Tracks=%d", release.Title, release.Date, countTracks(release.Media))
 
 	// Build artist name from credits
 	var artistName strings.Builder
@@ -229,22 +327,48 @@ func (p *MusicBrainzProvider) GetReleaseDetails(externalID string) (*models.Meta
 		label = release.LabelInfo[0].Label.Name
 	}
 
+	// Handle potential panic from [:4] on short date strings
+	year := "????"
+	if len(release.Date) >= 4 {
+		year = release.Date[:4]
+	}
+
+	log.Printf("[MUSICBRAINZ] Returning %d tracks for release", len(tracks))
 	return &models.MetadataCandidate{
 		Source:  "MusicBrainz",
 		Artist:  artistName.String(),
 		Album:   release.Title,
-		Year:    release.Date[:4],
+		Year:    year,
 		Genre:   strings.Join(genres, "; "),
 		Tracks:  tracks,
-		ExternalID: release.ID,
+		ExternalID: externalID,
 		Metadata: map[string]interface{}{
 			"releaseGroupID":   release.ReleaseGroup.ID,
 			"releaseGroupType": release.ReleaseGroup.Type,
 			"country":          release.Country,
 			"barcode":          release.Barcode,
 			"label":            label,
+			"releaseID":        release.ID,
 		},
 	}, nil
+}
+
+// countTracks counts total tracks across all media
+func countTracks(media []struct {
+	Position int `json:"position"`
+	Format   string `json:"format"`
+	Tracks   []struct {
+		ID          string `json:"id"`
+		Title       string `json:"title"`
+		Length      int    `json:"length"`
+		TrackNumber int    `json:"number"`
+	} `json:"tracks"`
+}) int {
+	total := 0
+	for _, m := range media {
+		total += len(m.Tracks)
+	}
+	return total
 }
 
 // GetCoverArt fetches cover art from Cover Art Archive
