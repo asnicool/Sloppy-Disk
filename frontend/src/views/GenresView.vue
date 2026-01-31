@@ -10,7 +10,10 @@
 
     <div v-else class="space-y-8">
       <div v-for="group in groups" :key="group.key" class="space-y-4">
-        <h2 class="text-2xl font-semibold text-primary-400 border-b border-neutral-800 pb-2">
+        <h2 class="text-2xl font-semibold text-primary-400 border-b border-neutral-800 pb-2 cursor-pointer hover:text-primary-300 transition-colors"
+            @click="navigateToGenre(group.key)"
+            :title="'Click to view all albums in ' + (group.key || 'Unknown Genre')"
+        >
           {{ group.key || 'Unknown Genre' }}
         </h2>
         
@@ -92,6 +95,10 @@ const changePage = (newPage) => {
 
 const navigateToAlbum = (albumName) => {
   router.push({ name: 'search', query: { q: albumName } })
+}
+
+const navigateToGenre = (genre) => {
+  router.push({ name: 'search', query: { q: genre, type: 'genre' } })
 }
 
 onMounted(fetchGroups)

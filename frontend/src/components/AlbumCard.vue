@@ -96,17 +96,22 @@
         </p>
       </div>
 
+      <!-- Metadata Status Badge -->
+      <div class="mt-2 mb-1 flex items-center gap-2">
+        <MetadataStatusBadge :album="{ name: album, artist, date, genre, coverUrl }" class="text-[10px]" />
+      </div>
+
       <!-- Immediate Metadata (from props) -->
-      <div v-if="date || genre" class="mt-2 flex flex-wrap items-center gap-2">
-        <span 
-          v-if="date" 
+      <div v-if="date || genre" class="flex flex-wrap items-center gap-2">
+        <span
+          v-if="date"
           class="px-2 py-0.5 bg-neutral-700/50 text-[10px] text-neutral-300 rounded-md border border-neutral-600/30 hover:bg-neutral-600 cursor-pointer transition-colors"
           @click.stop="filterBy('date', date)"
         >
           {{ date }}
         </span>
-        <span 
-          v-if="genre" 
+        <span
+          v-if="genre"
           class="px-2 py-0.5 max-w-[100px] truncate bg-neutral-700/50 text-[10px] text-neutral-300 rounded-md border border-neutral-600/30 hover:bg-neutral-600 cursor-pointer transition-colors"
           @click.stop="filterBy('genre', genre)"
           :title="genre"
@@ -136,6 +141,7 @@ import { useRouter } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
 import { generateHashColor } from '@/utils/color'
 import axios from 'axios'
+import MetadataStatusBadge from './MetadataStatusBadge.vue'
 
 const props = defineProps({
   album: {

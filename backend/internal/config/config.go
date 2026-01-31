@@ -16,10 +16,16 @@ type Config struct {
 	CoverArtRoot          string `json:"coverArtRoot"`
 	CoverArtBaseUrl       string `json:"coverArtBaseUrl"`
 	DiscogsToken          string `json:"discogsToken,omitempty"`
+	AlbumArtAPIKey        string `json:"albumArtApiKey,omitempty"`
 	RsyncRemoteTarget     string `json:"rsyncRemoteTarget"`
 	RsyncOptions          string `json:"rsyncOptions"`
 	RandomAlbumCount      int    `json:"randomAlbumCount"`
 	EnableActivityRefresh bool   `json:"enableActivityRefresh"`
+	// Metadata provider settings
+	MusicBrainzEnabled bool `json:"musicBrainzEnabled"`
+	DiscogsEnabled     bool `json:"discogsEnabled"`
+	FreeDBEnabled      bool `json:"freeDbEnabled"`
+	AlbumArtEnabled    bool `json:"albumArtEnabled"`
 }
 
 var (
@@ -103,10 +109,16 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		CoverArtRoot          *string `json:"coverArtRoot"`
 		CoverArtBaseUrl       *string `json:"coverArtBaseUrl"`
 		DiscogsToken          *string `json:"discogsToken"`
+		AlbumArtAPIKey        *string `json:"albumArtApiKey"`
 		RsyncRemoteTarget     *string `json:"rsyncRemoteTarget"`
 		RsyncOptions          *string `json:"rsyncOptions"`
 		RandomAlbumCount      *int    `json:"randomAlbumCount"`
 		EnableActivityRefresh *bool   `json:"enableActivityRefresh"`
+		// Metadata provider settings
+		MusicBrainzEnabled *bool `json:"musicBrainzEnabled"`
+		DiscogsEnabled     *bool `json:"discogsEnabled"`
+		FreeDBEnabled      *bool `json:"freeDbEnabled"`
+		AlbumArtEnabled    *bool `json:"albumArtEnabled"`
 	}
 
 	if err := json.Unmarshal(data, &temp); err != nil {
@@ -141,6 +153,9 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	if temp.DiscogsToken != nil {
 		c.DiscogsToken = *temp.DiscogsToken
 	}
+	if temp.AlbumArtAPIKey != nil {
+		c.AlbumArtAPIKey = *temp.AlbumArtAPIKey
+	}
 	if temp.RsyncRemoteTarget != nil {
 		c.RsyncRemoteTarget = *temp.RsyncRemoteTarget
 	}
@@ -152,6 +167,27 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	}
 	if temp.EnableActivityRefresh != nil {
 		c.EnableActivityRefresh = *temp.EnableActivityRefresh
+	}
+	// Set metadata provider defaults
+	if temp.MusicBrainzEnabled != nil {
+		c.MusicBrainzEnabled = *temp.MusicBrainzEnabled
+	} else {
+		c.MusicBrainzEnabled = true // Default to enabled
+	}
+	if temp.DiscogsEnabled != nil {
+		c.DiscogsEnabled = *temp.DiscogsEnabled
+	} else {
+		c.DiscogsEnabled = true // Default to enabled
+	}
+	if temp.FreeDBEnabled != nil {
+		c.FreeDBEnabled = *temp.FreeDBEnabled
+	} else {
+		c.FreeDBEnabled = true // Default to enabled
+	}
+	if temp.AlbumArtEnabled != nil {
+		c.AlbumArtEnabled = *temp.AlbumArtEnabled
+	} else {
+		c.AlbumArtEnabled = true // Default to enabled
 	}
 
 	return nil

@@ -28,10 +28,30 @@
       <div class="flex-1 w-full min-w-0 flex flex-col justify-end h-48">
         <div class="flex-1">
             <h1 class="text-4xl font-bold text-white mb-2 truncate" :title="albumName">{{ albumName }}</h1>
-            <p class="text-xl text-neutral-400 mb-2 truncate">{{ artistName }}</p>
+            <p 
+                class="text-xl text-neutral-400 mb-2 truncate cursor-pointer hover:text-primary-400 transition-colors"
+                @click="navigateToArtist"
+                :title="'Click to view all albums by ' + artistName"
+            >
+                {{ artistName }}
+            </p>
             <div v-if="albumDetails" class="flex flex-wrap gap-3 mb-4 text-sm">
-            <span v-if="albumDetails.date" class="text-neutral-500">{{ albumDetails.date }}</span>
-            <span v-if="albumDetails.genre" class="text-neutral-500 px-2 border-l border-neutral-700">{{ albumDetails.genre }}</span>
+            <span 
+                v-if="albumDetails.date" 
+                class="text-neutral-500 cursor-pointer hover:text-primary-400 transition-colors"
+                @click="navigateToDate"
+                :title="'Click to view all albums from ' + albumDetails.date"
+            >
+                {{ albumDetails.date }}
+            </span>
+            <span 
+                v-if="albumDetails.genre" 
+                class="text-neutral-500 px-2 border-l border-neutral-700 cursor-pointer hover:text-primary-400 transition-colors"
+                @click="navigateToGenre"
+                :title="'Click to view all albums in ' + albumDetails.genre"
+            >
+                {{ albumDetails.genre }}
+            </span>
             <span v-if="albumDetails.trackCount" class="text-neutral-500 px-2 border-l border-neutral-700">{{ albumDetails.trackCount }} tracks</span>
             </div>
         </div>
@@ -130,32 +150,16 @@
       </table>
     </div>
 
-    <!-- Metadata Search Modal -->
-    <div v-if="showMetadataModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div class="bg-neutral-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
-        <div class="p-6 border-b border-neutral-700 flex justify-between items-center">
-          <h2 class="text-xl font-bold text-white">Metadata Candidates</h2>
-          <button @click="showMetadataModal = false" class="text-neutral-400 hover:text-white">&times;</button>
-        </div>
-        <div class="p-6 overflow-y-auto flex-1 space-y-4">
-          <div v-if="searchingMetadata" class="text-center py-8 text-neutral-400">Searching Discogs...</div>
-          <div v-else-if="metadataCandidates.length === 0" class="text-center py-8 text-neutral-400">No candidates found.</div>
-          <div
-            v-for="candidate in metadataCandidates"
-            :key="candidate.externalId"
-            class="bg-neutral-700 p-4 rounded-lg flex justify-between items-center hover:bg-neutral-600 cursor-pointer transition-colors"
-            @click="applyMetadata(candidate)"
-          >
-            <div>
-              <h3 class="text-white font-medium">{{ candidate.album }}</h3>
-              <p class="text-neutral-400 text-sm">{{ candidate.artist }} ({{ candidate.year }})</p>
-              <p class="text-blue-400 text-xs mt-1">Source: {{ candidate.source }}</p>
-            </div>
-            <button class="text-blue-400 font-medium">Apply</button>
-          </div>
-        </div>
-      </div>
-    </div>
+     <!-- Metadata Search Modal -->
+     <MetadataSearchModal
+       v-if="showMetadataModal"
+       :is-open="showMetadataModal"
+       :initial-artist="artistName"
+       :initial-album="albumName"
+       :album-path="albumPath"
+       @close="showMetadataModal = false"
+       @applied="handleMetadataApplied"
+     />
 
     <!-- Cover Picker Modal -->
     <div v-if="showCoverPicker" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
@@ -187,11 +191,13 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
 import BaseToast from '@/components/BaseToast.vue'
+import MetadataSearchModal from '@/components/MetadataSearchModal.vue'
 
 const route = useRoute()
+const router = useRouter()
 const mpdStore = useMpdStore()
 
 const artistName = computed(() => route.params.artist)
@@ -276,6 +282,8 @@ const playSingleTrack = (track) => {
     mpdStore.addTracks([track.path], 'play')
 }
 
+const albumPath = ref('')
+
 const fetchAlbumDetails = async () => {
   loading.value = true
   console.log('[AlbumDetailView] Fetching album details:', artistName.value, '-', albumName.value)
@@ -301,6 +309,12 @@ const fetchAlbumDetails = async () => {
     } else {
       console.error('[AlbumDetailView] Could not parse response:', response)
     }
+
+    // Calculate album path from first track
+    if (tracks.value.length > 0) {
+      const firstTrack = tracks.value[0]
+      albumPath.value = firstTrack.path.split('/').slice(0, -1).join('/')
+    }
   } catch (error) {
     console.error('[AlbumDetailView] Error fetching album details:', error)
   } finally {
@@ -311,24 +325,12 @@ const fetchAlbumDetails = async () => {
 
 const searchMetadata = async () => {
   showMetadataModal.value = true
-  searchingMetadata.value = true
-  try {
-    const response = await mpdStore.fetchMetadataCandidates(artistName.value, albumName.value)
-    if (response.success) {
-      metadataCandidates.value = response.data
-    }
-  } finally {
-    searchingMetadata.value = false
-  }
 }
 
-const applyMetadata = async (candidate) => {
-  // In a real app, this would open an editor first
-  if (confirm(`Apply metadata from ${candidate.source}?`)) {
-    // Call backend to apply tags
-    alert('Metadata applied (mock)')
-    showMetadataModal.value = false
-  }
+const handleMetadataApplied = (result) => {
+  showNotification(`Metadata applied to ${result.updatedFiles} files`, 'success')
+  // Refresh album details to show updated metadata
+  fetchAlbumDetails()
 }
 
 const fetchCovers = async () => {
@@ -367,6 +369,22 @@ const formatDuration = (seconds) => {
   const minutes = Math.floor(seconds / 60)
   const remainingSeconds = Math.floor(seconds % 60)
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+}
+
+const navigateToArtist = () => {
+  router.push({ name: 'search', query: { q: artistName.value, type: 'artist' } })
+}
+
+const navigateToDate = () => {
+  if (albumDetails.value?.date) {
+    router.push({ name: 'search', query: { q: albumDetails.value.date, type: 'date' } })
+  }
+}
+
+const navigateToGenre = () => {
+  if (albumDetails.value?.genre) {
+    router.push({ name: 'search', query: { q: albumDetails.value.genre, type: 'genre' } })
+  }
 }
 
 // Handle cache update events from background refresh

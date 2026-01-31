@@ -71,6 +71,8 @@ func RegisterRoutes(r *mux.Router) {
 
 	// Metadata
 	api.HandleFunc("/metadata/search", SearchMetadata).Methods("GET")
+	api.HandleFunc("/metadata/details", GetMetadataDetails).Methods("GET")
+	api.HandleFunc("/metadata/apply", ApplyMetadata).Methods("POST")
 
 	// Cover Art - specific routes first, then catch-all
 	api.HandleFunc("/coverart/candidates", GetCoverArtCandidates).Methods("GET")
@@ -431,9 +433,17 @@ func UpdateAlbumTags(w http.ResponseWriter, r *http.Request) {
 func SearchMetadata(w http.ResponseWriter, r *http.Request) {
 	artist := r.URL.Query().Get("artist")
 	album := r.URL.Query().Get("album")
+	providersParam := r.URL.Query().Get("providers")
 
-	provider := metadata.NewDiscogsProvider()
-	candidates, err := provider.Search(artist, album)
+	// Parse providers list
+	var providers []string
+	if providersParam != "" {
+		providers = strings.Split(providersParam, ",")
+	}
+
+	// Use aggregator for multi-provider search
+	aggregator := metadata.NewAggregator()
+	candidates, err := aggregator.Search(r.Context(), artist, album, providers)
 	if err != nil {
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -441,14 +451,74 @@ func SearchMetadata(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, models.APIResponse{Success: true, Data: candidates})
 }
 
+func GetMetadataDetails(w http.ResponseWriter, r *http.Request) {
+	source := r.URL.Query().Get("source")
+	externalID := r.URL.Query().Get("externalId")
+
+	if source == "" || externalID == "" {
+		SendError(w, http.StatusBadRequest, "source and externalId are required")
+		return
+	}
+
+	aggregator := metadata.NewAggregator()
+	details, err := aggregator.GetReleaseDetails(r.Context(), source, externalID)
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if details == nil {
+		SendError(w, http.StatusNotFound, "Release not found")
+		return
+	}
+	SendJSON(w, models.APIResponse{Success: true, Data: details})
+}
+
+func ApplyMetadata(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		AlbumPath   string                       `json:"albumPath"`
+		Metadata    models.MetadataCandidate     `json:"metadata"`
+		CoverArtURL string                       `json:"coverArtUrl,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		SendError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		return
+	}
+
+	if req.AlbumPath == "" {
+		SendError(w, http.StatusBadRequest, "albumPath is required")
+		return
+	}
+
+	tagWriter := metadata.NewTagWriter()
+
+	// Apply metadata tags
+	result, err := tagWriter.ApplyMetadata(req.AlbumPath, req.Metadata)
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Apply cover art if provided
+	if req.CoverArtURL != "" {
+		if err := tagWriter.ApplyCoverArt(req.AlbumPath, req.CoverArtURL); err != nil {
+			// Log but don't fail
+			result.Errors = append(result.Errors, "Cover art: "+err.Error())
+		}
+	}
+
+	SendJSON(w, models.APIResponse{Success: true, Data: result})
+}
+
 func GetCoverArtCandidates(w http.ResponseWriter, r *http.Request) {
 	artist := r.URL.Query().Get("artist")
 	album := r.URL.Query().Get("album")
 
-	manager := coverart.NewManager()
-	candidates, err := manager.FetchCandidates(artist, album)
+	// Use metadata aggregator for cover art search
+	aggregator := metadata.NewAggregator()
+	candidates, err := aggregator.SearchCoverArt(r.Context(), artist, album)
 	if err != nil {
-		SendError(w, http.StatusInternalServerError, err.Error())
+		// Fallback to placeholder if aggregator fails
+		SendJSON(w, models.APIResponse{Success: true, Data: []models.CoverArtCandidate{}})
 		return
 	}
 	SendJSON(w, models.APIResponse{Success: true, Data: candidates})

@@ -75,6 +75,66 @@
       <p v-if="syncStatus?.lastError" class="text-red-400 text-sm mt-2">{{ syncStatus.lastError }}</p>
     </section>
 
+    <!-- Metadata Providers Section -->
+    <section class="bg-neutral-800 rounded-lg p-6 border border-neutral-700">
+      <h2 class="text-xl font-semibold text-white mb-4">Metadata Providers</h2>
+      <p class="text-neutral-400 text-sm mb-4">Configure which metadata providers to use when searching for album information.</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="flex items-center justify-between bg-neutral-700/50 p-3 rounded-lg">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-xs font-bold">MB</div>
+            <div>
+              <p class="text-white font-medium">MusicBrainz</p>
+              <p class="text-neutral-400 text-xs">Free, comprehensive database</p>
+            </div>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" v-model="config.musicBrainzEnabled" class="sr-only peer">
+            <div class="w-11 h-6 bg-neutral-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+          </label>
+        </div>
+        <div class="flex items-center justify-between bg-neutral-700/50 p-3 rounded-lg">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-orange-600 rounded flex items-center justify-center text-xs font-bold">DC</div>
+            <div>
+              <p class="text-white font-medium">Discogs</p>
+              <p class="text-neutral-400 text-xs">Requires API token</p>
+            </div>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" v-model="config.discogsEnabled" class="sr-only peer">
+            <div class="w-11 h-6 bg-neutral-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+          </label>
+        </div>
+        <div class="flex items-center justify-between bg-neutral-700/50 p-3 rounded-lg">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-green-600 rounded flex items-center justify-center text-xs font-bold">FD</div>
+            <div>
+              <p class="text-white font-medium">FreeDB</p>
+              <p class="text-neutral-400 text-xs">Good for older CDs</p>
+            </div>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" v-model="config.freeDbEnabled" class="sr-only peer">
+            <div class="w-11 h-6 bg-neutral-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+          </label>
+        </div>
+        <div class="flex items-center justify-between bg-neutral-700/50 p-3 rounded-lg">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-purple-600 rounded flex items-center justify-center text-xs font-bold">AA</div>
+            <div>
+              <p class="text-white font-medium">AlbumArt.digital</p>
+              <p class="text-neutral-400 text-xs">Cover art focused</p>
+            </div>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" v-model="config.albumArtEnabled" class="sr-only peer">
+            <div class="w-11 h-6 bg-neutral-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+          </label>
+        </div>
+      </div>
+    </section>
+
     <!-- Configuration Section -->
     <section class="bg-neutral-800 rounded-lg p-6 border border-neutral-700">
       <h2 class="text-xl font-semibold text-white mb-4">Configuration</h2>
@@ -99,6 +159,10 @@
           <div>
             <label class="block text-neutral-400 text-sm mb-1">Discogs Token</label>
             <input v-model="config.discogsToken" type="password" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-neutral-400 text-sm mb-1">AlbumArt.digital API Key</label>
+            <input v-model="config.albumArtApiKey" type="password" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none">
           </div>
           <div>
             <label class="block text-neutral-400 text-sm mb-1">Rsync Target</label>
@@ -200,8 +264,13 @@ const config = ref({
   musicRoot: '',
   coverArtRoot: '',
   discogsToken: '',
+  albumArtApiKey: '',
   rsyncRemoteTarget: '',
-  enableActivityRefresh: true
+  enableActivityRefresh: true,
+  musicBrainzEnabled: true,
+  discogsEnabled: true,
+  freeDbEnabled: true,
+  albumArtEnabled: true
 })
 
 let syncInterval = null

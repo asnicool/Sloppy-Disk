@@ -70,13 +70,15 @@ type MPDStatus struct {
 
 // MetadataCandidate represents a metadata record from external sources
 type MetadataCandidate struct {
-	Source     string `json:"source"`
-	Artist     string `json:"artist"`
-	Album      string `json:"album"`
-	Year       string `json:"year,omitempty"`
-	Genre      string `json:"genre,omitempty"`
-	Tracks     []Song `json:"tracks,omitempty"`
-	ExternalID string `json:"externalId,omitempty"`
+	Source     string                 `json:"source"`
+	Artist     string                 `json:"artist"`
+	Album      string                 `json:"album"`
+	Year       string                 `json:"year,omitempty"`
+	Genre      string                 `json:"genre,omitempty"`
+	Tracks     []Song                 `json:"tracks,omitempty"`
+	ExternalID string                 `json:"externalId,omitempty"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
+	Confidence float64                `json:"confidence,omitempty"`
 }
 
 // CoverArtCandidate represents a cover art image from external sources
@@ -147,4 +149,27 @@ type ArtistGroup struct {
 type GroupedResult struct {
 	Key    string   `json:"key"`
 	Albums []string `json:"albums"`
+}
+
+// MetadataField represents a field that can be provided by metadata sources
+type MetadataField string
+
+const (
+	FieldArtistID MetadataField = "artist_id"
+	FieldAlbumID  MetadataField = "album_id"
+	FieldMBID     MetadataField = "musicbrainz_id"
+	FieldDiscogs  MetadataField = "discogs_id"
+	FieldLastFM   MetadataField = "lastfm_id"
+)
+
+// AlbumMetadata represents enriched album metadata from external sources
+type AlbumMetadata struct {
+	Artist     string                 `json:"artist"`
+	Album      string                 `json:"album"`
+	Year       int                    `json:"year,omitempty"`
+	Genre      string                 `json:"genre,omitempty"`
+	Tracks     []Song                 `json:"tracks,omitempty"`
+	Provider   string                 `json:"provider"`
+	Confidence float64                `json:"confidence,omitempty"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 }

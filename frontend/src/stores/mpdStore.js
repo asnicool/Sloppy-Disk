@@ -594,9 +594,14 @@ export const useMpdStore = defineStore('mpd', () => {
         coverArtRoot: newConfig.coverArtRoot,
         coverArtBaseUrl: newConfig.coverArtBaseUrl,
         discogsToken: newConfig.discogsToken,
+        albumArtApiKey: newConfig.albumArtApiKey,
         rsyncRemoteTarget: newConfig.rsyncRemoteTarget,
         rsyncOptions: newConfig.rsyncOptions,
-        enableActivityRefresh: newConfig.enableActivityRefresh
+        enableActivityRefresh: newConfig.enableActivityRefresh,
+        musicBrainzEnabled: newConfig.musicBrainzEnabled,
+        discogsEnabled: newConfig.discogsEnabled,
+        freeDbEnabled: newConfig.freeDbEnabled,
+        albumArtEnabled: newConfig.albumArtEnabled
       }
       
       const response = await axios.post(`${API_BASE}/config`, configToSend)
@@ -660,20 +665,51 @@ export const useMpdStore = defineStore('mpd', () => {
     }
   }
 
-  // Metadata search function
-  const fetchMetadataCandidates = async (artist, album) => {
-    try {
-      const params = new URLSearchParams({
-        artist: artist,
-        album: album
-      })
-      const response = await axios.get(`${API_BASE}/metadata/search?${params}`)
-      return response.data
-    } catch (error) {
-      console.error('Fetch metadata candidates failed:', error)
-      throw error
-    }
-  }
+   // Metadata search functions
+   const fetchMetadataCandidates = async (artist, album, providers = []) => {
+     try {
+       const params = new URLSearchParams({
+         artist: artist,
+         album: album
+       })
+       if (providers.length > 0) {
+         params.append('providers', providers.join(','))
+       }
+       const response = await axios.get(`${API_BASE}/metadata/search?${params}`)
+       return response.data
+     } catch (error) {
+       console.error('Fetch metadata candidates failed:', error)
+       throw error
+     }
+   }
+
+   const fetchMetadataDetails = async (source, externalId) => {
+     try {
+       const params = new URLSearchParams({
+         source: source,
+         externalId: externalId
+       })
+       const response = await axios.get(`${API_BASE}/metadata/details?${params}`)
+       return response.data
+     } catch (error) {
+       console.error('Fetch metadata details failed:', error)
+       throw error
+     }
+   }
+
+   const applyMetadata = async (albumPath, metadata, coverArtUrl = '') => {
+     try {
+       const response = await axios.post(`${API_BASE}/metadata/apply`, {
+         albumPath: albumPath,
+         metadata: metadata,
+         coverArtUrl: coverArtUrl
+       })
+       return response.data
+     } catch (error) {
+       console.error('Apply metadata failed:', error)
+       throw error
+     }
+   }
 
   // Polling for status updates (fallback for when WebSocket fails)
   const startPolling = () => {
@@ -771,9 +807,11 @@ export const useMpdStore = defineStore('mpd', () => {
     getCacheStats,
     clearCache,
     invalidateAlbumCache,
-    fetchCoverArtCandidates,
-    applyCoverArt,
-    fetchMetadataCandidates,
+     fetchCoverArtCandidates,
+     applyCoverArt,
+     fetchMetadataCandidates,
+     fetchMetadataDetails,
+     applyMetadata,
     startPolling,
     stopPolling,
     getSyncStatus,

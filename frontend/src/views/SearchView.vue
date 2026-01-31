@@ -43,14 +43,14 @@
     <div v-if="hasAnyResults" class="space-y-10">
       
       <!-- Artists -->
-      <section v-if="results.artists.length" class="space-y-4">
+      <section v-if="sortedArtists.length" class="space-y-4">
         <h2 class="text-xl font-bold text-primary-400 flex items-center">
           <span class="mr-2">Artists</span>
-          <span class="px-2 py-0.5 bg-neutral-800 text-xs rounded-full text-neutral-400">{{ results.artists.length }}</span>
+          <span class="px-2 py-0.5 bg-neutral-800 text-xs rounded-full text-neutral-400">{{ sortedArtists.length }}</span>
         </h2>
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <div 
-            v-for="artist in results.artists" 
+            v-for="artist in sortedArtists" 
             :key="artist"
             @click="navigateToArtist(artist)"
             class="bg-neutral-800/40 p-3 rounded-lg hover:bg-neutral-700/60 transition-colors cursor-pointer text-center group border border-neutral-800"
@@ -85,14 +85,14 @@
       </section>
 
       <!-- Songs -->
-      <section v-if="results.songs.length" class="space-y-4">
+      <section v-if="sortedSongs.length" class="space-y-4">
         <h2 class="text-xl font-bold text-primary-400 flex items-center">
           <span class="mr-2">Songs</span>
-          <span class="px-2 py-0.5 bg-neutral-800 text-xs rounded-full text-neutral-400">{{ results.songs.length }}</span>
+          <span class="px-2 py-0.5 bg-neutral-800 text-xs rounded-full text-neutral-400">{{ sortedSongs.length }}</span>
         </h2>
         <div class="bg-neutral-800/30 rounded-xl overflow-hidden border border-neutral-800">
           <div 
-            v-for="(song, idx) in results.songs" 
+            v-for="(song, idx) in sortedSongs" 
             :key="song.path + idx"
             @click="playSong(song)"
             class="flex items-center px-4 py-3 hover:bg-neutral-700/40 cursor-pointer transition-colors border-b border-neutral-800/50 last:border-0 group"
@@ -113,11 +113,11 @@
 
       <!-- Genres & Dates (Smaller grids) -->
        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <section v-if="results.genres.length" class="space-y-4">
+          <section v-if="sortedGenres.length" class="space-y-4">
             <h2 class="text-lg font-bold text-primary-300">Genres</h2>
             <div class="flex flex-wrap gap-2">
               <button 
-                v-for="genre in results.genres" 
+                v-for="genre in sortedGenres" 
                 :key="genre"
                 @click="navigateToGenre(genre)"
                 class="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-sm text-neutral-300 rounded-full transition-colors border border-neutral-700"
@@ -127,11 +127,11 @@
             </div>
           </section>
 
-          <section v-if="results.dates.length" class="space-y-4">
+          <section v-if="sortedDates.length" class="space-y-4">
             <h2 class="text-lg font-bold text-primary-300">Dates</h2>
             <div class="flex flex-wrap gap-2">
               <button 
-                v-for="date in results.dates" 
+                v-for="date in sortedDates" 
                 :key="date"
                 @click="navigateToDate(date)"
                 class="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-sm text-neutral-300 rounded-full transition-colors border border-neutral-700"
@@ -167,6 +167,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
 import { debounce } from 'lodash-es'
 import AlbumCard from '@/components/AlbumCard.vue'
+import { sortByRelevance, filterByExactMatch, sortByDateDesc } from '@/utils/fuzzyMatch'
 
 const router = useRouter()
 const route = useRoute()
@@ -203,18 +204,67 @@ const results = computed(() => {
   }
 })
 
-// Sort albums by date (newest first)
+// Determine if this is an exact match search (clicked from artist/date/genre)
+const isExactSearch = computed(() => {
+  return route.query.type === 'artist' || route.query.type === 'date' || route.query.type === 'genre'
+})
+
+// Sort and filter albums based on search type
 const sortedAlbums = computed(() => {
   const albums = results.value.albums || []
-  return [...albums].sort((a, b) => {
-    // Handle dates - prefer newer first
-    const dateA = a.date || ''
-    const dateB = b.date || ''
-    // Try to parse as year (4 digits) or full date
-    const yearA = parseInt(dateA.substring(0, 4)) || 0
-    const yearB = parseInt(dateB.substring(0, 4)) || 0
-    return yearB - yearA
-  })
+  
+  if (isExactSearch.value) {
+    // For exact match searches, filter and sort by date
+    const searchType = route.query.type
+    const searchValue = query.value
+    
+    let filtered = albums
+    if (searchType === 'artist') {
+      filtered = filterByExactMatch(albums, 'artist', searchValue)
+    } else if (searchType === 'date') {
+      filtered = filterByExactMatch(albums, 'date', searchValue)
+    } else if (searchType === 'genre') {
+      filtered = filterByExactMatch(albums, 'genre', searchValue)
+    }
+    
+    return sortByDateDesc(filtered)
+  } else {
+    // For general searches, sort by date (newest first) as default
+    // The backend already returns results, we just sort them
+    return sortByDateDesc(albums)
+  }
+})
+
+// Sort artists by relevance for general search
+const sortedArtists = computed(() => {
+  if (isExactSearch.value) {
+    return results.value.artists
+  }
+  return sortByRelevance(results.value.artists, query.value, ['name']).map(a => a.name)
+})
+
+// Sort genres by relevance for general search
+const sortedGenres = computed(() => {
+  if (isExactSearch.value) {
+    return results.value.genres
+  }
+  return sortByRelevance(results.value.genres.map(g => ({ name: g })), query.value, ['name']).map(g => g.name)
+})
+
+// Sort dates by relevance for general search
+const sortedDates = computed(() => {
+  if (isExactSearch.value) {
+    return results.value.dates
+  }
+  return sortByRelevance(results.value.dates.map(d => ({ name: d })), query.value, ['name']).map(d => d.name)
+})
+
+// Sort songs by relevance for general search
+const sortedSongs = computed(() => {
+  if (isExactSearch.value) {
+    return results.value.songs
+  }
+  return sortByRelevance(results.value.songs, query.value, ['title', 'artist', 'album'])
 })
 const isSearching = computed(() => mpdStore.isSearching)
 const hasAnyResults = computed(() => {
@@ -241,7 +291,7 @@ const performSearch = (searchTerm, exact = false, category = '') => {
 const handleRouteQuery = () => {
   const q = route.query.q
   const type = route.query.type || ''
-  if (q && q.length >= 3) {
+  if (q) {
     query.value = q
     performSearch(q, !!type, type)
   }
@@ -265,17 +315,17 @@ const navigateToAlbum = (album) => {
 
 const navigateToArtist = (artist) => {
   query.value = artist
-  performSearch(artist, true)
+  router.push({ name: 'search', query: { q: artist, type: 'artist' } })
 }
 
 const navigateToGenre = (genre) => {
   query.value = genre
-  performSearch(genre, true)
+  router.push({ name: 'search', query: { q: genre, type: 'genre' } })
 }
 
 const navigateToDate = (date) => {
   query.value = date
-  performSearch(date, true)
+  router.push({ name: 'search', query: { q: date, type: 'date' } })
 }
 
 onUnmounted(() => {

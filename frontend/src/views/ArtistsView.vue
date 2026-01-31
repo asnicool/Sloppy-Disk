@@ -4,7 +4,10 @@
     <div v-if="loading" class="text-neutral-400">Loading artists...</div>
     <div v-else class="space-y-8">
       <div v-for="artistGroup in artists" :key="artistGroup.artist" class="space-y-4">
-        <h2 class="text-2xl font-semibold text-primary-400 border-b border-neutral-800 pb-2 flex items-center">
+        <h2 class="text-2xl font-semibold text-primary-400 border-b border-neutral-800 pb-2 flex items-center cursor-pointer hover:text-primary-300 transition-colors"
+            @click="navigateToArtist(artistGroup.artist)"
+            :title="'Click to view all albums by ' + (artistGroup.artist || 'Unknown Artist')"
+        >
           <svg class="w-6 h-6 mr-2 text-neutral-400" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
           </svg>
@@ -100,6 +103,10 @@ const prevPage = async () => {
 
 const navigateToAlbum = (artist, album) => {
   router.push({ name: 'search', query: { q: `${artist} ${album}` } })
+}
+
+const navigateToArtist = (artist) => {
+  router.push({ name: 'search', query: { q: artist, type: 'artist' } })
 }
 
 onMounted(async () => {

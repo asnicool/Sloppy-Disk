@@ -10,7 +10,10 @@
 
     <div v-else class="space-y-8">
       <div v-for="group in groups" :key="group.key" class="space-y-4">
-        <h2 class="text-2xl font-semibold text-primary-400 border-b border-neutral-800 pb-2">
+        <h2 class="text-2xl font-semibold text-primary-400 border-b border-neutral-800 pb-2 cursor-pointer hover:text-primary-300 transition-colors"
+            @click="navigateToDate(group.key)"
+            :title="'Click to view all albums from ' + (group.key || 'Unknown Date')"
+        >
           {{ group.key || 'Unknown Date' }}
         </h2>
         
@@ -95,6 +98,10 @@ const navigateToAlbum = (albumName) => {
   // but we can search for the album or use a generic search.
   // For now, let's just go to search with the album name.
   router.push({ name: 'search', query: { q: albumName } })
+}
+
+const navigateToDate = (date) => {
+  router.push({ name: 'search', query: { q: date, type: 'date' } })
 }
 
 onMounted(fetchGroups)
