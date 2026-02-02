@@ -16,6 +16,8 @@ type Config struct {
 	CoverArtRoot          string `json:"coverArtRoot"`
 	CoverArtBaseUrl       string `json:"coverArtBaseUrl"`
 	DiscogsToken          string `json:"discogsToken,omitempty"`
+	DiscogsKey            string `json:"discogsKey,omitempty"`
+	DiscogsSecret         string `json:"discogsSecret,omitempty"`
 	AlbumArtAPIKey        string `json:"albumArtApiKey,omitempty"`
 	RsyncRemoteTarget     string `json:"rsyncRemoteTarget"`
 	RsyncOptions          string `json:"rsyncOptions"`
@@ -109,6 +111,8 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		CoverArtRoot          *string `json:"coverArtRoot"`
 		CoverArtBaseUrl       *string `json:"coverArtBaseUrl"`
 		DiscogsToken          *string `json:"discogsToken"`
+		DiscogsKey            *string `json:"discogsKey"`
+		DiscogsSecret         *string `json:"discogsSecret"`
 		AlbumArtAPIKey        *string `json:"albumArtApiKey"`
 		RsyncRemoteTarget     *string `json:"rsyncRemoteTarget"`
 		RsyncOptions          *string `json:"rsyncOptions"`
@@ -152,6 +156,12 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	}
 	if temp.DiscogsToken != nil {
 		c.DiscogsToken = *temp.DiscogsToken
+	}
+	if temp.DiscogsKey != nil {
+		c.DiscogsKey = *temp.DiscogsKey
+	}
+	if temp.DiscogsSecret != nil {
+		c.DiscogsSecret = *temp.DiscogsSecret
 	}
 	if temp.AlbumArtAPIKey != nil {
 		c.AlbumArtAPIKey = *temp.AlbumArtAPIKey

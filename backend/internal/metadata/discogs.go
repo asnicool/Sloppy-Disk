@@ -37,19 +37,31 @@ func (p *DiscogsProvider) Name() string {
 // Search searches for releases on Discogs
 func (p *DiscogsProvider) Search(artist, album string) ([]models.MetadataCandidate, error) {
 	cfg := config.Get()
-	if cfg.DiscogsToken == "" {
-		return nil, fmt.Errorf("Discogs token not configured")
+	hasKeySecret := cfg.DiscogsKey != "" && cfg.DiscogsSecret != ""
+	hasToken := cfg.DiscogsToken != ""
+
+	if !hasKeySecret && !hasToken {
+		return nil, fmt.Errorf("Discogs credentials not configured")
 	}
 
 	query := url.Values{}
 	query.Set("release_title", album)
 	query.Set("artist", artist)
 	query.Set("type", "release")
-	query.Set("token", cfg.DiscogsToken)
+
+	// Use token if Key/Secret are not available
+	if !hasKeySecret && hasToken {
+		query.Set("token", cfg.DiscogsToken)
+	}
 
 	req, err := p.newRequest("GET", "/database/search", query)
 	if err != nil {
 		return nil, NewProviderError("Discogs", err)
+	}
+
+	// Add Authorization header if Key/Secret are available
+	if hasKeySecret {
+		req.Header.Set("Authorization", fmt.Sprintf("Discogs key=%s, secret=%s", cfg.DiscogsKey, cfg.DiscogsSecret))
 	}
 
 	resp, err := p.client.Do(req)
@@ -64,11 +76,11 @@ func (p *DiscogsProvider) Search(artist, album string) ([]models.MetadataCandida
 
 	var result struct {
 		Results []struct {
-			Title      string `json:"title"`
-			Year       string `json:"year"`
-			ID         int    `json:"id"`
-			Thumb      string `json:"thumb"`
-			CoverImage string `json:"cover_image"`
+			Title      string   `json:"title"`
+			Year       string   `json:"year"`
+			ID         int      `json:"id"`
+			Thumb      string   `json:"thumb"`
+			CoverImage string   `json:"cover_image"`
 			Genre      []string `json:"genre"`
 			Style      []string `json:"style"`
 		} `json:"results"`
@@ -101,11 +113,11 @@ func (p *DiscogsProvider) Search(artist, album string) ([]models.MetadataCandida
 			Genre:      genre,
 			ExternalID: strconv.Itoa(r.ID),
 			Metadata: map[string]interface{}{
-				"fullTitle":    r.Title,
-				"thumbnail":    r.Thumb,
-				"coverImage":   r.CoverImage,
-				"genres":       r.Genre,
-				"styles":       r.Style,
+				"fullTitle":  r.Title,
+				"thumbnail":  r.Thumb,
+				"coverImage": r.CoverImage,
+				"genres":     r.Genre,
+				"styles":     r.Style,
 			},
 		})
 	}
@@ -116,16 +128,27 @@ func (p *DiscogsProvider) Search(artist, album string) ([]models.MetadataCandida
 // GetReleaseDetails fetches detailed metadata for a Discogs release
 func (p *DiscogsProvider) GetReleaseDetails(externalID string) (*models.MetadataCandidate, error) {
 	cfg := config.Get()
-	if cfg.DiscogsToken == "" {
-		return nil, fmt.Errorf("Discogs token not configured")
+	hasKeySecret := cfg.DiscogsKey != "" && cfg.DiscogsSecret != ""
+	hasToken := cfg.DiscogsToken != ""
+
+	if !hasKeySecret && !hasToken {
+		return nil, fmt.Errorf("Discogs credentials not configured")
 	}
 
 	params := url.Values{}
-	params.Set("token", cfg.DiscogsToken)
+	// Use token if Key/Secret are not available
+	if !hasKeySecret && hasToken {
+		params.Set("token", cfg.DiscogsToken)
+	}
 
 	req, err := p.newRequest("GET", "/releases/"+externalID, params)
 	if err != nil {
 		return nil, NewProviderError("Discogs", err)
+	}
+
+	// Add Authorization header if Key/Secret are available
+	if hasKeySecret {
+		req.Header.Set("Authorization", fmt.Sprintf("Discogs key=%s, secret=%s", cfg.DiscogsKey, cfg.DiscogsSecret))
 	}
 
 	resp, err := p.client.Do(req)
@@ -139,25 +162,25 @@ func (p *DiscogsProvider) GetReleaseDetails(externalID string) (*models.Metadata
 	}
 
 	var release struct {
-		ID          int    `json:"id"`
-		Title       string `json:"title"`
-		Year        int    `json:"year"`
-		Country     string `json:"country"`
-		Label       []struct {
+		ID      int    `json:"id"`
+		Title   string `json:"title"`
+		Year    int    `json:"year"`
+		Country string `json:"country"`
+		Label   []struct {
 			Name string `json:"name"`
 		} `json:"label"`
-		Genre       []string `json:"genre"`
-		Style       []string `json:"style"`
-		Tracklist   []struct {
+		Genre     []string `json:"genre"`
+		Style     []string `json:"style"`
+		Tracklist []struct {
 			Title    string `json:"title"`
 			Position string `json:"position"`
 			Duration string `json:"duration"`
 			Type_    string `json:"type_"`
 		} `json:"tracklist"`
-		Artists     []struct {
+		Artists []struct {
 			Name string `json:"name"`
 		} `json:"artists"`
-		Images      []struct {
+		Images []struct {
 			Type   string `json:"type"`
 			URI    string `json:"uri"`
 			Height int    `json:"height"`
