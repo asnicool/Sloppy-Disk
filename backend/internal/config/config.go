@@ -24,9 +24,11 @@ type Config struct {
 	RandomAlbumCount      int    `json:"randomAlbumCount"`
 	EnableActivityRefresh bool   `json:"enableActivityRefresh"`
 	// Metadata provider settings
+	// Metadata provider settings
 	MusicBrainzEnabled bool `json:"musicBrainzEnabled"`
 	DiscogsEnabled     bool `json:"discogsEnabled"`
-	FreeDBEnabled      bool `json:"freeDbEnabled"`
+	FreeDBEnabled      bool `json:"freeDbEnabled"` // Deprecated: Use GNUDbEnabled
+	GNUDbEnabled       bool `json:"gnuDbEnabled"`
 	AlbumArtEnabled    bool `json:"albumArtEnabled"`
 }
 
@@ -122,6 +124,7 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 		MusicBrainzEnabled *bool `json:"musicBrainzEnabled"`
 		DiscogsEnabled     *bool `json:"discogsEnabled"`
 		FreeDBEnabled      *bool `json:"freeDbEnabled"`
+		GNUDbEnabled       *bool `json:"gnuDbEnabled"`
 		AlbumArtEnabled    *bool `json:"albumArtEnabled"`
 	}
 
@@ -189,11 +192,18 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	} else {
 		c.DiscogsEnabled = true // Default to enabled
 	}
-	if temp.FreeDBEnabled != nil {
-		c.FreeDBEnabled = *temp.FreeDBEnabled
+	// Map FreeDBEnabled to GNUDbEnabled for backward compatibility
+	if temp.GNUDbEnabled != nil {
+		c.GNUDbEnabled = *temp.GNUDbEnabled
+	} else if temp.FreeDBEnabled != nil {
+		c.GNUDbEnabled = *temp.FreeDBEnabled
 	} else {
-		c.FreeDBEnabled = true // Default to enabled
+		c.GNUDbEnabled = true // Default to enabled
 	}
+
+	// Keep FreeDBEnabled synced just in case, though it's deprecated
+	c.FreeDBEnabled = c.GNUDbEnabled
+
 	if temp.AlbumArtEnabled != nil {
 		c.AlbumArtEnabled = *temp.AlbumArtEnabled
 	} else {

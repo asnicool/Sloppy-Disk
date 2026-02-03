@@ -435,11 +435,24 @@ func SearchMetadata(w http.ResponseWriter, r *http.Request) {
 	artist := r.URL.Query().Get("artist")
 	album := r.URL.Query().Get("album")
 	providersParam := r.URL.Query().Get("providers")
+	trackCountStr := r.URL.Query().Get("trackCount")
+	durationStr := r.URL.Query().Get("duration")
 
 	log.Printf("[METADATA HANDLER] SearchMetadata called")
 	log.Printf("[METADATA HANDLER]   Artist: '%s'", artist)
 	log.Printf("[METADATA HANDLER]   Album: '%s'", album)
 	log.Printf("[METADATA HANDLER]   Providers param: '%s'", providersParam)
+	log.Printf("[METADATA HANDLER]   TrackCount: '%s', Duration: '%s'", trackCountStr, durationStr)
+
+	// Parse optional params
+	var trackCount int
+	var duration int
+	if trackCountStr != "" {
+		fmt.Sscanf(trackCountStr, "%d", &trackCount)
+	}
+	if durationStr != "" {
+		fmt.Sscanf(durationStr, "%d", &duration)
+	}
 
 	// Parse providers list
 	var providers []string
@@ -453,7 +466,7 @@ func SearchMetadata(w http.ResponseWriter, r *http.Request) {
 	// Use aggregator for multi-provider search
 	log.Printf("[METADATA HANDLER] Creating aggregator and starting search...")
 	aggregator := metadata.NewAggregator()
-	candidates, err := aggregator.Search(r.Context(), artist, album, providers)
+	candidates, err := aggregator.Search(r.Context(), artist, album, providers, trackCount, duration)
 	if err != nil {
 		log.Printf("[METADATA HANDLER] Search failed with error: %v", err)
 		SendError(w, http.StatusInternalServerError, err.Error())
@@ -491,7 +504,7 @@ func GetMetadataDetails(w http.ResponseWriter, r *http.Request) {
 		SendError(w, http.StatusNotFound, "Release not found")
 		return
 	}
-	
+
 	log.Printf("[METADATA DETAILS] Successfully fetched details for '%s - %s' (%s)", details.Artist, details.Album, details.Year)
 	log.Printf("[METADATA DETAILS]   Tracks: %d", len(details.Tracks))
 	SendJSON(w, models.APIResponse{Success: true, Data: details})
@@ -499,9 +512,9 @@ func GetMetadataDetails(w http.ResponseWriter, r *http.Request) {
 
 func ApplyMetadata(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		AlbumPath   string                       `json:"albumPath"`
-		Metadata    models.MetadataCandidate     `json:"metadata"`
-		CoverArtURL string                       `json:"coverArtUrl,omitempty"`
+		AlbumPath   string                   `json:"albumPath"`
+		Metadata    models.MetadataCandidate `json:"metadata"`
+		CoverArtURL string                   `json:"coverArtUrl,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		SendError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())

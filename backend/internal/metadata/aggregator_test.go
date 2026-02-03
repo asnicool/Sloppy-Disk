@@ -18,10 +18,10 @@ func (e *MockError) Error() string {
 
 // mockProvider is a simple mock implementation of Provider for testing
 type mockProvider struct {
-	name     string
-	results  []models.MetadataCandidate
-	details  *models.MetadataCandidate
-	err      error
+	name    string
+	results []models.MetadataCandidate
+	details *models.MetadataCandidate
+	err     error
 }
 
 func (m *mockProvider) Name() string {
@@ -86,7 +86,7 @@ func TestAggregator_Search(t *testing.T) {
 	aggregator.AddProvider(provider1)
 	aggregator.AddProvider(provider2)
 
-	results, err := aggregator.Search(context.Background(), "Test Artist", "Test Album", []string{})
+	results, err := aggregator.Search(context.Background(), "Test Artist", "Test Album", []string{}, 0, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestAggregator_Search_Deduplication(t *testing.T) {
 	aggregator.AddProvider(provider1)
 	aggregator.AddProvider(provider2)
 
-	results, err := aggregator.Search(context.Background(), "Test Artist", "Test Album", []string{})
+	results, err := aggregator.Search(context.Background(), "Test Artist", "Test Album", []string{}, 0, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestAggregator_Search_NoResults(t *testing.T) {
 	aggregator := &Aggregator{}
 	aggregator.AddProvider(provider)
 
-	results, err := aggregator.Search(context.Background(), "Test Artist", "Test Album", []string{})
+	results, err := aggregator.Search(context.Background(), "Test Artist", "Test Album", []string{}, 0, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestAggregator_Search_ProviderError(t *testing.T) {
 	aggregator.AddProvider(errorProvider)
 	aggregator.AddProvider(workingProvider)
 
-	results, err := aggregator.Search(context.Background(), "Test Artist", "Test Album", []string{})
+	results, err := aggregator.Search(context.Background(), "Test Artist", "Test Album", []string{}, 0, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestAggregator_Search_ProviderError(t *testing.T) {
 func TestAggregator_Search_NoProviders(t *testing.T) {
 	aggregator := &Aggregator{}
 
-	results, err := aggregator.Search(context.Background(), "Test Artist", "Test Album", []string{})
+	results, err := aggregator.Search(context.Background(), "Test Artist", "Test Album", []string{}, 0, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -366,5 +366,68 @@ func TestDeduplicateCoverArt(t *testing.T) {
 	// Should have 2 unique cover art candidates
 	if len(result) != 2 {
 		t.Errorf("Expected 2 unique cover art candidates, got %d", len(result))
+	}
+}
+func TestCalculateConfidence(t *testing.T) {
+	tests := []struct {
+		name             string
+		candidate        models.MetadataCandidate
+		queryArtist      string
+		queryAlbum       string
+		queryTrackCount  int
+		expectedMinScore float64
+		expectedMaxScore float64
+	}{
+		{
+			name: "Perfect match",
+			candidate: models.MetadataCandidate{
+				Artist:   "The Beatles",
+				Album:    "Abbey Road",
+				Source:   "MusicBrainz",
+				Metadata: map[string]interface{}{"trackCount": 17},
+			},
+			queryArtist:      "The Beatles",
+			queryAlbum:       "Abbey Road",
+			queryTrackCount:  17,
+			expectedMinScore: 125, // 60 base + 30 artist + 30 album + 10 source + 10 bonus
+			expectedMaxScore: 150,
+		},
+		{
+			name: "Track count mismatch - small",
+			candidate: models.MetadataCandidate{
+				Artist:   "The Beatles",
+				Album:    "Abbey Road",
+				Source:   "MusicBrainz",
+				Metadata: map[string]interface{}{"trackCount": 19},
+			},
+			queryArtist:      "The Beatles",
+			queryAlbum:       "Abbey Road",
+			queryTrackCount:  17,
+			expectedMinScore: 100, // 60 + 30 + 30 + 10 - 5 penalty = 125
+			expectedMaxScore: 130,
+		},
+		{
+			name: "Track count mismatch - large",
+			candidate: models.MetadataCandidate{
+				Artist:   "The Beatles",
+				Album:    "Abbey Road",
+				Source:   "MusicBrainz",
+				Metadata: map[string]interface{}{"trackCount": 10},
+			},
+			queryArtist:      "The Beatles",
+			queryAlbum:       "Abbey Road",
+			queryTrackCount:  17,
+			expectedMinScore: 70, // 60 + 30 + 30 + 10 - 30 penalty = 100
+			expectedMaxScore: 110,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			score := calculateConfidence(tc.candidate, tc.queryArtist, tc.queryAlbum, tc.queryTrackCount, 0)
+			if score < tc.expectedMinScore || score > tc.expectedMaxScore {
+				t.Errorf("calculateConfidence() score = %f, expected between %f and %f", score, tc.expectedMinScore, tc.expectedMaxScore)
+			}
+		})
 	}
 }

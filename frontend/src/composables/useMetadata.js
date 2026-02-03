@@ -8,7 +8,7 @@ export function useMetadata() {
   const error = ref(null)
   const applyResult = ref(null)
 
-  const searchMetadata = async (artist, album, providers = []) => {
+  const searchMetadata = async (artist, album, providers = [], trackCount = 0, duration = 0) => {
     loading.value = true
     error.value = null
     candidates.value = []
@@ -20,6 +20,12 @@ export function useMetadata() {
       })
       if (providers.length > 0) {
         params.append('providers', providers.join(','))
+      }
+      if (trackCount > 0) {
+        params.append('trackCount', trackCount)
+      }
+      if (duration > 0) {
+        params.append('duration', duration)
       }
 
       const response = await fetch(`/api/metadata/search?${params}`)

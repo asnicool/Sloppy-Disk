@@ -140,13 +140,14 @@
       </table>
     </div>
 
-     <!-- Metadata Search Modal -->
      <MetadataSearchModal
        v-if="showMetadataModal"
        :is-open="showMetadataModal"
        :initial-artist="artistName"
        :initial-album="albumName"
        :album-path="albumPath"
+       :track-count="albumDetails?.trackCount"
+       :duration="albumDetails?.duration"
        @close="showMetadataModal = false"
        @applied="handleMetadataApplied"
      />

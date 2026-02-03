@@ -29,8 +29,8 @@ func NewAggregator() *Aggregator {
 	if cfg.DiscogsEnabled {
 		providers = append(providers, NewDiscogsProvider())
 	}
-	if cfg.FreeDBEnabled {
-		providers = append(providers, NewFreeDBProvider())
+	if cfg.GNUDbEnabled {
+		providers = append(providers, NewGNUDbProvider())
 	}
 	if cfg.AlbumArtEnabled {
 		providers = append(providers, NewAlbumArtProvider())
@@ -45,8 +45,8 @@ func (a *Aggregator) AddProvider(p Provider) {
 }
 
 // Search searches all providers in parallel and aggregates results
-func (a *Aggregator) Search(ctx context.Context, artist, album string, providers []string) ([]models.MetadataCandidate, error) {
-	log.Printf("[METADATA SEARCH] Starting search - Artist: '%s', Album: '%s'", artist, album)
+func (a *Aggregator) Search(ctx context.Context, artist, album string, providers []string, trackCount int, duration int) ([]models.MetadataCandidate, error) {
+	log.Printf("[METADATA SEARCH] Starting search - Artist: '%s', Album: '%s', TrackCount: %d, Duration: %d", artist, album, trackCount, duration)
 	log.Printf("[METADATA SEARCH] Available providers: %d", len(a.providers))
 	for _, p := range a.providers {
 		log.Printf("[METADATA SEARCH]   - %s", p.Name())
@@ -81,7 +81,7 @@ func (a *Aggregator) Search(ctx context.Context, artist, album string, providers
 	results := make([]models.MetadataCandidate, 0)
 
 	log.Printf("[METADATA SEARCH] Starting parallel search across %d providers", len(activeProviders))
-	
+
 	for _, p := range activeProviders {
 		wg.Add(1)
 		go func(provider Provider) {
@@ -96,15 +96,15 @@ func (a *Aggregator) Search(ctx context.Context, artist, album string, providers
 
 			log.Printf("[METADATA SEARCH] [%s] Found %d candidates", provider.Name(), len(candidates))
 			for i, c := range candidates {
-				log.Printf("[METADATA SEARCH] [%s]   Candidate %d: Artist='%s', Album='%s', Year='%s', ExternalID='%s'", 
+				log.Printf("[METADATA SEARCH] [%s]   Candidate %d: Artist='%s', Album='%s', Year='%s', ExternalID='%s'",
 					provider.Name(), i, c.Artist, c.Album, c.Year, c.ExternalID)
 			}
 
 			mu.Lock()
 			for i := range candidates {
 				// Calculate confidence score
-				candidates[i].Confidence = calculateConfidence(candidates[i], artist, album)
-				log.Printf("[METADATA SEARCH] [%s]   Candidate %d confidence: %.2f", 
+				candidates[i].Confidence = calculateConfidence(candidates[i], artist, album, trackCount, duration)
+				log.Printf("[METADATA SEARCH] [%s]   Candidate %d confidence: %.2f",
 					provider.Name(), i, candidates[i].Confidence)
 			}
 			results = append(results, candidates...)
@@ -127,7 +127,7 @@ func (a *Aggregator) Search(ctx context.Context, artist, album string, providers
 	// Log final results
 	log.Printf("[METADATA SEARCH] Final results (sorted by confidence):")
 	for i, r := range results {
-		log.Printf("[METADATA SEARCH]   %d. [%.2f] %s - %s (%s) from %s", 
+		log.Printf("[METADATA SEARCH]   %d. [%.2f] %s - %s (%s) from %s",
 			i+1, r.Confidence, r.Artist, r.Album, r.Year, r.Source)
 	}
 
@@ -175,8 +175,8 @@ func (a *Aggregator) SearchCoverArt(ctx context.Context, artist, album string) (
 }
 
 // calculateConfidence calculates a confidence score for a candidate
-func calculateConfidence(candidate models.MetadataCandidate, queryArtist, queryAlbum string) float64 {
-	var score float64 = 50 // Base score
+func calculateConfidence(candidate models.MetadataCandidate, queryArtist, queryAlbum string, trackCount int, duration int) float64 {
+	var score float64 = 60 // Base score increased slightly
 
 	// Artist similarity (0-30 points)
 	normalizedCandidateArtist := normalizeString(candidate.Artist)
@@ -196,15 +196,61 @@ func calculateConfidence(candidate models.MetadataCandidate, queryArtist, queryA
 		score += 10
 	case "Discogs":
 		score += 7
+	case "GNUDb":
+		score += 5
 	default:
 		score += 5
 	}
 
-	log.Printf("[CONFIDENCE] Artist: '%s' vs '%s' = %.4f (%.1f pts)", 
+	// Track Count Penalty
+	// If candidate has tracks, check count
+	candidateTrackCount := 0
+	if candidate.Metadata != nil {
+		if tc, ok := candidate.Metadata["trackCount"]; ok {
+			// Try various types
+			switch v := tc.(type) {
+			case int:
+				candidateTrackCount = v
+			case float64:
+				candidateTrackCount = int(v)
+			}
+		}
+	}
+	// Fallback to counting tracks slice if empty
+	if candidateTrackCount == 0 && len(candidate.Tracks) > 0 {
+		candidateTrackCount = len(candidate.Tracks)
+	}
+
+	trackPenalty := 0.0
+	if trackCount > 0 && candidateTrackCount > 0 {
+		diff := trackCount - candidateTrackCount
+		if diff < 0 {
+			diff = -diff
+		}
+
+		if diff == 0 {
+			score += 10 // Bonus for exact match
+		} else if diff <= 2 {
+			trackPenalty = 5.0 // Small penalty
+		} else if diff <= 5 {
+			trackPenalty = 15.0 // Moderate penalty
+		} else {
+			trackPenalty = 30.0 // Heavy penalty
+		}
+		score -= trackPenalty
+	}
+
+	// Duration Penalty (if available) -- Not usually available in search results for all providers, skipping for now to keep it simple unless we want to fetch details (which is expensive)
+	// But if we do have it (e.g. from some provider metadata), we could use it.
+
+	log.Printf("[CONFIDENCE] Artist: '%s' vs '%s' = %.4f (%.1f pts)",
 		normalizedCandidateArtist, normalizedQueryArtist, artistScore, artistScore*30)
-	log.Printf("[CONFIDENCE] Album: '%s' vs '%s' = %.4f (%.1f pts)", 
+	log.Printf("[CONFIDENCE] Album: '%s' vs '%s' = %.4f (%.1f pts)",
 		normalizedCandidateAlbum, normalizedQueryAlbum, albumScore, albumScore*30)
-	log.Printf("[CONFIDENCE] Source bonus: %s = %.1f pts", candidate.Source, score-50-artistScore*30-albumScore*30)
+
+	if trackCount > 0 && candidateTrackCount > 0 {
+		log.Printf("[CONFIDENCE] TrackCount: Query=%d, Candidate=%d (Bonus/Penalty: %.1f)", trackCount, candidateTrackCount, 10.0-trackPenalty) // If exact match bonus=10, penalty=0.
+	}
 
 	return score
 }

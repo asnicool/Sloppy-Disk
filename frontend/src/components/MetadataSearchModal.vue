@@ -160,7 +160,9 @@ const props = defineProps({
   isOpen: Boolean,
   initialArtist: String,
   initialAlbum: String,
-  albumPath: String
+  albumPath: String,
+  trackCount: Number,
+  duration: Number
 })
 
 const emit = defineEmits(['close', 'applied'])
@@ -180,8 +182,8 @@ const {
 
 const searchArtist = ref('')
 const searchAlbum = ref('')
-const selectedProviders = ref(['MusicBrainz', 'Discogs', 'FreeDB'])
-const providers = ['MusicBrainz', 'Discogs', 'FreeDB']
+const selectedProviders = ref(['MusicBrainz', 'Discogs', 'GNUDb', 'AlbumArt.digital'])
+const providers = ['MusicBrainz', 'Discogs', 'GNUDb', 'AlbumArt.digital']
 const coverArtOptions = ref([])
 const selectedCoverArt = ref(null)
 const applying = ref(false)
@@ -209,7 +211,13 @@ const handleSearch = async () => {
   coverArtOptions.value = []
   selectedCoverArt.value = null
   
-  await searchMetadata(artist, album, selectedProviders.value)
+  await searchMetadata(
+    artist,
+    album,
+    selectedProviders.value,
+    props.trackCount,
+    props.duration
+  )
   
   // Also search for cover art
   coverArtOptions.value = await searchCoverArt(artist, album)

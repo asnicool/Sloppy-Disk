@@ -84,7 +84,8 @@ export const useMpdStore = defineStore('mpd', () => {
         ws.value = null
       }
       
-      ws.value = new WebSocket(`ws://${window.location.host}/ws`)
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      ws.value = new WebSocket(`${wsProtocol}//${window.location.host}/ws`)
       
       ws.value.onopen = () => {
         console.log('WebSocket connected')
@@ -143,7 +144,8 @@ export const useMpdStore = defineStore('mpd', () => {
         searchWs.value = null
       }
 
-      searchWs.value = new WebSocket(`ws://${window.location.host}/ws/search`)
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      searchWs.value = new WebSocket(`${wsProtocol}//${window.location.host}/ws/search`)
       
       searchWs.value.onopen = () => {
         console.log('Search WebSocket connected')
@@ -600,7 +602,8 @@ export const useMpdStore = defineStore('mpd', () => {
         enableActivityRefresh: newConfig.enableActivityRefresh,
         musicBrainzEnabled: newConfig.musicBrainzEnabled,
         discogsEnabled: newConfig.discogsEnabled,
-        freeDbEnabled: newConfig.freeDbEnabled,
+        freeDbEnabled: newConfig.freeDbEnabled, // Legacy support
+        gnuDbEnabled: newConfig.gnuDbEnabled,
         albumArtEnabled: newConfig.albumArtEnabled
       }
       
