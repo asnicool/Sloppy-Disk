@@ -220,7 +220,7 @@ const initData = () => {
 const expanded = ref(false)
 const imageLoaded = ref(false)
 const currentImageSrc = ref('')
-const usingStaticUrl = ref(false)
+const usingFolderUrl = ref(false)
 
 // Generate consistent background color
 const bgColor = computed(() => {
@@ -229,38 +229,71 @@ const bgColor = computed(() => {
   return generateHashColor(props.artist + props.album + dateSeed)
 })
 
-const fallbackToApi = () => {
-    usingStaticUrl.value = false
-    currentImageSrc.value = props.coverUrl || fullDetails.value?.album?.coverUrl || ''
+// Build the /folder URL from album path
+const buildFolderUrl = (path) => {
+    if (!path) return null
+    
+    const lastSlash = path.lastIndexOf('/')
+    if (lastSlash !== -1) {
+        const dir = path.substring(0, lastSlash)
+        // Encode the directory path components
+        const encodedDir = dir.split('/').map(encodeURIComponent).join('/')
+        return `/folder/${encodedDir}/Folder.jpg`
+    }
+    return null
 }
 
-// Resolve the best image source
-const resolveImageSource = () => {
-    // 1. If we have a track path and static config, try that first
-    if (mpdStore.config?.coverArtBaseUrl && fullDetails.value?.tracks?.length > 0) {
-        const trackPath = fullDetails.value.tracks[0].path
-        // Get directory name
-        const lastSlash = trackPath.lastIndexOf('/')
-        if (lastSlash !== -1) {
-            const dir = trackPath.substring(0, lastSlash)
-            // Ensure base url ends with slash and dir doesn't start with slash (or handle it)
-            const baseUrl = mpdStore.config.coverArtBaseUrl.endsWith('/') 
-                ? mpdStore.config.coverArtBaseUrl 
-                : mpdStore.config.coverArtBaseUrl + '/'
-            
-            // Encode the directory path components
-            // But usually web servers expect standard URL encoding
-            // Let's assume the path segments need encoding
-            const encodedDir = dir.split('/').map(encodeURIComponent).join('/')
-            
-            currentImageSrc.value = `${baseUrl}${encodedDir}/Folder.jpg`
-            usingStaticUrl.value = true
-            return
-        }
-    }
+// Check if a URL returns 404 (run in background)
+const checkFolderExists = (url) => {
+    fetch(url, { method: 'HEAD' })
+        .then(response => {
+            if (response.status === 404) {
+                console.log('[AlbumCard] Folder URL not found (404), switching to API')
+                fallbackToApi()
+            }
+            // If 200+, folder URL works, keep it
+        })
+        .catch(() => {
+            // Network error - fallback to API
+            fallbackToApi()
+        })
+}
 
-    // 2. Fallback to API/Prop
-    fallbackToApi()
+// Resolve the best image source - load /folder first immediately, check later
+const resolveImageSource = () => {
+    // 1. Get the path to use (prefer track path, fall back to album path)
+    const path = fullDetails.value?.tracks?.length > 0 
+        ? fullDetails.value.tracks[0].path 
+        : fullDetails.value?.album?.path
+    
+    if (!path) {
+        fallbackToApi()
+        return
+    }
+    
+    const folderUrl = buildFolderUrl(path)
+    if (!folderUrl) {
+        fallbackToApi()
+        return
+    }
+    
+    // 2. Use /folder URL immediately (browser will cache it if it loads fast)
+    console.log('[AlbumCard] Using folder URL:', folderUrl)
+    currentImageSrc.value = folderUrl
+    usingFolderUrl.value = true
+    
+    // 3. In background, check if it returns 404
+    checkFolderExists(folderUrl)
+}
+
+const fallbackToApi = () => {
+    // Only fallback if we're still using the folder URL
+    if (usingFolderUrl.value) {
+        usingFolderUrl.value = false
+        const fallbackUrl = props.coverUrl || fullDetails.value?.album?.coverUrl || ''
+        console.log('[AlbumCard] fallbackToApi:', fallbackUrl)
+        currentImageSrc.value = fallbackUrl
+    }
 }
 
 const handleImageLoad = () => {
@@ -268,11 +301,15 @@ const handleImageLoad = () => {
 }
 
 const handleImageError = () => {
-  if (usingStaticUrl.value) {
-      console.log('Static cover failed, falling back to API')
+  // Only fall back if we were using /folder and haven't checked yet
+  if (usingFolderUrl.value && !folderUrlChecked.value) {
+      console.log('[AlbumCard] Image load error, checking if 404 or other error')
+      // The image failed to load - could be 404 or other error
+      // Since we already checked with fetch, this is likely a network error
+      // Try the API fallback anyway
       fallbackToApi()
   } else {
-      // API also failed, clear it to show default icon
+      // API also failed or already checked, clear it to show default icon
       imageLoaded.value = true // Stop loading animation
       currentImageSrc.value = ''
   }
@@ -282,6 +319,8 @@ const handleImageError = () => {
 watch(() => props.albumDetails, (newVal) => {
     if (newVal) {
         initData()
+        // Reset state when new data arrives
+        usingFolderUrl.value = false
         resolveImageSource()
     }
 }, { deep: true, immediate: true })
@@ -375,6 +414,8 @@ const handleCacheUpdate = (event) => {
   if (artist === props.artist && album === props.album) {
     console.log('[AlbumCard] Cache updated for:', artist, '-', album)
     fullDetails.value = data
+    // Reset state when cache updates
+    usingFolderUrl.value = false
     resolveImageSource()
   }
 }

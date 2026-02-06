@@ -359,7 +359,7 @@ func (c *Connection) GetStatus() (*models.MPDStatus, error) {
 
 		// Parse status response
 		attrs := ParseResponse(responses[0])
-		
+
 		// Parse currentsong response
 		songAttrs := ParseResponse(responses[1])
 
@@ -663,7 +663,7 @@ func parseInt(s string) int {
 	if s == "" {
 		return 0
 	}
-	
+
 	var i int
 	n, err := fmt.Sscanf(s, "%d", &i)
 	if err != nil || n != 1 {
@@ -1143,7 +1143,9 @@ func (c *Connection) ResetConnection() {
 	}
 }
 
-// GetAllAlbumKeys returns all unique album keys (album + albumartist + date)
+// GetAllAlbumKeys returns all unique album keys (album + albumartist + date + genre)
+// Uses the command: list genre group albumartist group date group album
+// This groups albums by genre first, then artist, then date, then album name
 func (c *Connection) GetAllAlbumKeys() ([]models.AlbumKey, error) {
 	if err := c.EnsureConnection(); err != nil {
 		return nil, err
@@ -1156,6 +1158,7 @@ func (c *Connection) GetAllAlbumKeys() ([]models.AlbumKey, error) {
 	c.conn.SetDeadline(time.Now().Add(120 * time.Second))
 
 	// list album group albumartist group date group genre
+	// Order matters: higher level groups first.
 	cmd := "list album group albumartist group date group genre"
 
 	if _, err := c.writer.WriteString(cmd + "\n"); err != nil {
@@ -1195,7 +1198,9 @@ func (c *Connection) GetAllAlbumKeys() ([]models.AlbumKey, error) {
 	var keys []models.AlbumKey
 	lines := strings.Split(strings.TrimSpace(resp), "\n")
 
-	var currentAlbum, currentArtist, currentDate, currentGenre string
+	// MPD list output with grouping maintains state
+	// When a higher-level group changes, all lower-level groups MUST be reset
+	var currentAlbumArtist, currentDate, currentGenre string
 	keys = make([]models.AlbumKey, 0)
 
 	for _, line := range lines {
@@ -1210,20 +1215,24 @@ func (c *Connection) GetAllAlbumKeys() ([]models.AlbumKey, error) {
 		key, value := parts[0], parts[1]
 
 		switch key {
-		case "Album":
-			currentAlbum = value
-			keys = append(keys, models.AlbumKey{
-				Album:       currentAlbum,
-				AlbumArtist: currentArtist,
-				Date:        currentDate,
-				Genre:       currentGenre,
-			})
-		case "AlbumArtist":
-			currentArtist = value
+		case "AlbumArtist", "Artist":
+			currentAlbumArtist = value
+			currentDate = ""
+			currentGenre = ""
 		case "Date":
 			currentDate = value
+			currentGenre = ""
 		case "Genre":
 			currentGenre = value
+		case "Album":
+			if value != "" {
+				keys = append(keys, models.AlbumKey{
+					Album:       value,
+					AlbumArtist: currentAlbumArtist,
+					Date:        currentDate,
+					Genre:       currentGenre,
+				})
+			}
 		}
 	}
 

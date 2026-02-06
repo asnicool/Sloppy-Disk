@@ -443,6 +443,45 @@ func (ac *AlbumCache) SearchAlbums(query string, offset, limit int) ([]models.Al
 	return result, total
 }
 
+// GetAllAlbums returns all albums from the cache
+func (ac *AlbumCache) GetAllAlbums() []models.Album {
+	ac.mu.RLock()
+	defer ac.mu.RUnlock()
+	
+	// Return a copy to prevent external modification
+	result := make([]models.Album, len(ac.albums))
+	copy(result, ac.albums)
+	return result
+}
+
+// SearchAlbumsByFields searches albums by any field (album, artist, genre, date)
+// Returns albums matching the query in any of these fields
+func (ac *AlbumCache) SearchAlbumsByFields(query string) []models.Album {
+	ac.mu.RLock()
+	defer ac.mu.RUnlock()
+	
+	if len(ac.albums) == 0 {
+		return []models.Album{}
+	}
+	
+	query = strings.ToLower(strings.TrimSpace(query))
+	if query == "" {
+		return ac.albums
+	}
+	
+	var results []models.Album
+	for _, album := range ac.albums {
+		if strings.Contains(strings.ToLower(album.Album), query) ||
+		   strings.Contains(strings.ToLower(album.Artist), query) ||
+		   strings.Contains(strings.ToLower(album.Genre), query) ||
+		   strings.Contains(strings.ToLower(album.Date), query) {
+			results = append(results, album)
+		}
+	}
+	
+	return results
+}
+
 // GetCachedPage returns a cached page if it exists and hasn't expired
 func (ac *AlbumCache) GetCachedPage(key string) ([]models.Album, bool) {
 	ac.pageCacheMutex.RLock()

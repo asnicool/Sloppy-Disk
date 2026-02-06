@@ -56,6 +56,7 @@ func RegisterRoutes(r *mux.Router) {
 
 	// Albums & Artists
 	api.HandleFunc("/albums", HandleAlbumList).Methods("GET")
+	api.HandleFunc("/albums/all", HandleAllAlbums).Methods("GET")
 	api.HandleFunc("/albums/random", HandleRandomAlbums).Methods("GET")
 	api.HandleFunc("/albums/search", HandleAlbumSearch).Methods("GET")
 	api.HandleFunc("/albums/enrich", HandleAlbumEnrich).Methods("POST")

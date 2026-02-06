@@ -287,6 +287,23 @@ func HandleAlbumDetails(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// HandleAllAlbums handles /api/albums/all
+// Returns all albums from the cache for local search/filtering
+func HandleAllAlbums(w http.ResponseWriter, r *http.Request) {
+	cache := albumcache.GetCache()
+	
+	// Get all albums from cache
+	allAlbums := cache.GetAllAlbums()
+	
+	response := models.APIResponse{
+		Success: true,
+		Data:    allAlbums,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
 // HandleRandomAlbums handles /api/albums/random
 func HandleRandomAlbums(w http.ResponseWriter, r *http.Request) {
 	count := config.Get().RandomAlbumCount

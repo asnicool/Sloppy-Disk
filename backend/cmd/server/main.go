@@ -24,6 +24,7 @@ import (
 
 func main() {
 	// 1. Load Configuration
+	configPath := "config.json"
 	if err := config.Load(); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
@@ -75,6 +76,22 @@ func main() {
 
 	// 3. Register Routes
 	api.RegisterRoutes(r)
+
+	// Static file serving for music folder (for cover art)
+	// This serves files from the musicRoot directory at /folder path
+	cfg := config.Get()
+	if cfg.MusicRoot != "" {
+		musicRoot := cfg.MusicRoot
+		// Ensure musicRoot is an absolute path
+		if !filepath.IsAbs(musicRoot) {
+			// Try to make it absolute relative to the config file location
+			if absConfigPath, err := filepath.Abs(configPath); err == nil {
+				musicRoot = filepath.Join(filepath.Dir(absConfigPath), musicRoot)
+			}
+		}
+		log.Printf("Serving music files from: %s", musicRoot)
+		r.PathPrefix("/folder/").Handler(http.StripPrefix("/folder/", http.FileServer(http.Dir(musicRoot))))
+	}
 
 	// Static file serving for frontend
 	// Use relative paths to stay portable after project moves

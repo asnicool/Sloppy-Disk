@@ -22,28 +22,56 @@
           </router-link>
           
           <div class="min-w-0 flex-1 leading-tight">
-            <h3 class="text-sm font-bold text-white truncate cursor-default">
+            <h3 class="text-sm font-bold text-white truncate cursor-default mb-0.5">
               <span v-if="currentSong?.track" class="text-gray-400 mr-1.5 font-mono text-xs">{{ formatTrack(currentSong.track) }}</span>
               {{ currentSong?.title || 'No song playing' }}
             </h3>
-            <div class="flex items-center text-xs text-gray-400 space-x-1 whitespace-nowrap overflow-hidden">
+            
+            <!-- Progress bar for small screens (underlying song info) -->
+            <div class="md:hidden w-full bg-gray-700/50 rounded-full h-1 relative mb-0.5 cursor-pointer" @click="seekToSmall($event)">
+              <div 
+                class="bg-blue-500 h-full rounded-full transition-all ease-linear relative overflow-visible"
+                :style="{ width: `${progressPercentage}%`, transitionDuration: transitionDuration }"
+              >
+                <div class="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full shadow-lg scale-0 group-hover:scale-100 transition-transform"></div>
+              </div>
+            </div>
+            
+            <!-- Artist & Album info (2 lines on small screens) -->
+            <div class="flex flex-col md:flex-row md:items-center text-xs text-gray-400 space-y-0.5 md:space-y-0 md:space-x-1 whitespace-nowrap overflow-hidden">
               <span 
                 @click="searchBy(currentSong?.artist)"
-                class="hover:text-blue-400 cursor-pointer transition-colors max-w-[120px] truncate"
+                class="hover:text-blue-400 cursor-pointer transition-colors max-w-full truncate"
               >{{ currentSong?.artist || 'Unknown Artist' }}</span>
-              <span class="text-gray-600 px-0.5">•</span>
-              <span 
-                @click="searchBy(currentSong?.date)"
-                v-if="currentSong?.date"
-                class="hover:text-blue-400 cursor-pointer transition-colors"
-                title="Search by Date"
-              >{{ currentSong.date }}</span>
-              <span v-if="currentSong?.date" class="mx-0.5">-</span>
-              <span 
-                @click="searchBy(currentSong?.album)"
-                v-if="currentSong?.album"
-                class="hover:text-blue-400 cursor-pointer transition-colors truncate"
-              >{{ currentSong.album }}</span>
+              <div class="hidden md:inline text-gray-600">•</div>
+              <div class="md:hidden flex items-center space-x-1">
+                <span 
+                  @click="searchBy(currentSong?.date)"
+                  v-if="currentSong?.date"
+                  class="hover:text-blue-400 cursor-pointer transition-colors"
+                  title="Search by Date"
+                >{{ currentSong.date }}</span>
+                <span v-if="currentSong?.date" class="text-gray-600">-</span>
+                <span 
+                  @click="searchBy(currentSong?.album)"
+                  v-if="currentSong?.album"
+                  class="hover:text-blue-400 cursor-pointer transition-colors truncate"
+                >{{ currentSong.album }}</span>
+              </div>
+              <div class="hidden md:flex items-center md:space-x-1">
+                <span 
+                  @click="searchBy(currentSong?.date)"
+                  v-if="currentSong?.date"
+                  class="hover:text-blue-400 cursor-pointer transition-colors"
+                  title="Search by Date"
+                >{{ currentSong.date }}</span>
+                <span v-if="currentSong?.date" class="text-gray-600">-</span>
+                <span 
+                  @click="searchBy(currentSong?.album)"
+                  v-if="currentSong?.album"
+                  class="hover:text-blue-400 cursor-pointer transition-colors truncate"
+                >{{ currentSong.album }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -99,8 +127,8 @@
           </button>
         </div>
 
-        <!-- Volume Toggle -->
-        <div v-if="volume !== -1" class="relative group shrink-0 ml-1">
+        <!-- Volume Toggle (only show if volume is supported by MPD) -->
+        <div v-if="volumeSupported" class="relative group shrink-0 ml-1">
           <button 
             @click="showVolumeSlider = !showVolumeSlider"
             class="p-2 rounded-full hover:bg-gray-700/50 transition-colors"
@@ -175,6 +203,11 @@ const volume = computed(() => mpdStore.volume)
 const playlist = computed(() => mpdStore.playlist)
 const playlistCurrentPos = computed(() => mpdStore.playlistCurrentPos)
 
+// Check if volume is supported by MPD (volume field only present when supported)
+const volumeSupported = computed(() => {
+  return mpdStore.status && 'volume' in mpdStore.status
+})
+
 const coverUrl = computed(() => {
   if (currentSong.value?.path) {
     const path = currentSong.value.path
@@ -220,6 +253,20 @@ const setVolume = (v) => mpdStore.setVolume(parseInt(v))
 const searchBy = (q) => {
   if (!q) return
   router.push({ name: 'search', query: { q } })
+}
+
+// Seek handler for small screen progress bar
+const seekToSmall = (event) => {
+  const progressBar = event.currentTarget
+  if (!progressBar || !duration.value) return
+  const rect = progressBar.getBoundingClientRect()
+  const percentage = (event.clientX - rect.left) / rect.width
+  const seekTime = percentage * duration.value
+  
+  // Trigger seek via store
+  // Note: This is a visual-only seek, backend seek would need implementation
+  transitionDuration.value = '0s'
+  progressPercentage.value = percentage * 100
 }
 
 const formatTrack = (track) => {
