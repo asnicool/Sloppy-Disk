@@ -86,7 +86,7 @@
 </template>
 
 <script setup>
-import { watch, computed } from 'vue'
+import { watch, computed, onUnmounted } from 'vue'
 import { useFocusTrap } from '@/composables/useFocusTrap'
 
 const props = defineProps({
@@ -139,6 +139,11 @@ watch(() => props.modelValue, (isOpen) => {
     document.body.style.overflow = ''
     deactivate()
   }
+})
+
+// Cleanup on unmount
+onUnmounted(() => {
+  document.body.style.overflow = ''
 })
 
 const close = () => {

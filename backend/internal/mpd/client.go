@@ -36,7 +36,8 @@ type connectionPool struct {
 }
 
 type Client struct {
-	pool *connectionPool
+	pool      *connectionPool
+	semaphore chan struct{}
 }
 
 var (
@@ -76,11 +77,13 @@ func NewStatusClient() *Connection {
 
 func GetPool() *Client {
 	poolOnce.Do(func() {
+		maxConns := 8 // Limit concurrent MPD commands
 		defaultPool = &Client{
 			pool: &connectionPool{
-				conns: make(chan *Connection, 10),
-				max:   10,
+				conns: make(chan *Connection, maxConns),
+				max:   maxConns,
 			},
+			semaphore: make(chan struct{}, maxConns),
 		}
 	})
 	return defaultPool
@@ -990,6 +993,14 @@ func (c *Client) SendCommand(command string) (string, error) {
 }
 
 func (c *Client) Execute(fn func(*Connection) error) error {
+	// Acquire semaphore token with timeout
+	select {
+	case c.semaphore <- struct{}{}:
+		defer func() { <-c.semaphore }()
+	case <-time.After(500 * time.Millisecond):
+		return fmt.Errorf("server busy: too many concurrent MPD commands")
+	}
+
 	conn := c.acquire()
 	defer c.release(conn)
 	return fn(conn)

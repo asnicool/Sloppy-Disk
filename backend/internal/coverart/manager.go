@@ -1,34 +1,82 @@
 package coverart
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"mpd-client-modern/internal/config"
+	"mpd-client-modern/internal/metadata"
 	"mpd-client-modern/internal/models"
+	"mpd-client-modern/internal/mpd"
 )
 
+type candidateKey struct {
+	artist string
+	album  string
+}
+
 type Manager struct {
-	client *http.Client
+	client     *http.Client
+	cacheMu    sync.Mutex
+	candidates map[candidateKey][]models.CoverArtCandidate
+	cacheOrder []candidateKey
 }
 
 func NewManager() *Manager {
 	return &Manager{
-		client: &http.Client{Timeout: 30 * time.Second},
+		client:     &http.Client{Timeout: 30 * time.Second},
+		candidates: make(map[candidateKey][]models.CoverArtCandidate),
 	}
 }
 
 func (m *Manager) FetchCandidates(artist, album string) ([]models.CoverArtCandidate, error) {
-	// This would call multiple providers (Discogs, MusicBrainz, etc.)
-	// For now, returning a placeholder
-	return []models.CoverArtCandidate{
-		{Source: "Placeholder", URL: "https://via.placeholder.com/500", Size: "500x500"},
-	}, nil
+	key := candidateKey{artist: strings.ToLower(artist), album: strings.ToLower(album)}
+
+	m.cacheMu.Lock()
+	if cands, ok := m.candidates[key]; ok {
+		// Move to end for LRU
+		m.removeFromOrder(key)
+		m.cacheOrder = append(m.cacheOrder, key)
+		m.cacheMu.Unlock()
+		return cands, nil
+	}
+	m.cacheMu.Unlock()
+
+	// Use aggregator to fetch candidates
+	aggregator := metadata.NewAggregator()
+	cands, err := aggregator.SearchCoverArt(context.Background(), artist, album)
+	if err != nil {
+		return nil, err
+	}
+
+	m.cacheMu.Lock()
+	// Maintain max 20 entries
+	if len(m.cacheOrder) >= 20 {
+		oldest := m.cacheOrder[0]
+		delete(m.candidates, oldest)
+		m.cacheOrder = m.cacheOrder[1:]
+	}
+	m.candidates[key] = cands
+	m.cacheOrder = append(m.cacheOrder, key)
+	m.cacheMu.Unlock()
+
+	return cands, nil
+}
+
+func (m *Manager) removeFromOrder(key candidateKey) {
+	for i, k := range m.cacheOrder {
+		if k == key {
+			m.cacheOrder = append(m.cacheOrder[:i], m.cacheOrder[i+1:]...)
+			return
+		}
+	}
 }
 
 func (m *Manager) ApplyCover(albumPath string, imageURL string) error {
@@ -45,15 +93,31 @@ func (m *Manager) ApplyCover(albumPath string, imageURL string) error {
 		return fmt.Errorf("failed to download image: %s", resp.Status)
 	}
 
-	// 2. Determine destination path (mirroring music structure on SSD)
-	destDir := filepath.Join(cfg.CoverArtRoot, albumPath)
+	// 2. Determine destination path
+	var destDir string
+	if cfg.CoverArtRoot != "" {
+		destDir = filepath.Join(cfg.CoverArtRoot, albumPath)
+	} else {
+		destDir = filepath.Join(cfg.MusicRoot, albumPath)
+	}
+
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return err
 	}
 
-	// 3. Save as Folder.jpg (or appropriate extension)
-	ext := ".jpg" // Should detect from Content-Type
-	destPath := filepath.Join(destDir, "Folder"+ext)
+	// 3. Detect extension from Content-Type
+	ext := ".jpg"
+	contentType := resp.Header.Get("Content-Type")
+	switch contentType {
+	case "image/png":
+		ext = ".png"
+	case "image/webp":
+		ext = ".webp"
+	case "image/gif":
+		ext = ".gif"
+	}
+
+	destPath := filepath.Join(destDir, "folder"+ext)
 
 	f, err := os.Create(destPath)
 	if err != nil {
@@ -62,6 +126,58 @@ func (m *Manager) ApplyCover(albumPath string, imageURL string) error {
 	defer f.Close()
 
 	_, err = io.Copy(f, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	// 4. Trigger MPD update for this path
+	client := mpd.GetClient()
+	_, err = client.SendCommand(fmt.Sprintf("update %q", albumPath))
+	return err
+}
+
+func (m *Manager) SaveUploadedCover(albumPath string, reader io.Reader, contentType string) error {
+	cfg := config.Get()
+
+	// 1. Determine destination path
+	var destDir string
+	if cfg.CoverArtRoot != "" {
+		destDir = filepath.Join(cfg.CoverArtRoot, albumPath)
+	} else {
+		destDir = filepath.Join(cfg.MusicRoot, albumPath)
+	}
+
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return err
+	}
+
+	// 2. Detect extension from Content-Type
+	ext := ".jpg"
+	switch contentType {
+	case "image/png":
+		ext = ".png"
+	case "image/webp":
+		ext = ".webp"
+	case "image/gif":
+		ext = ".gif"
+	}
+
+	destPath := filepath.Join(destDir, "folder"+ext)
+
+	f, err := os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, reader)
+	if err != nil {
+		return err
+	}
+
+	// 3. Trigger MPD update for this path
+	client := mpd.GetClient()
+	_, err = client.SendCommand(fmt.Sprintf("update %q", albumPath))
 	return err
 }
 

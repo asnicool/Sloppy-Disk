@@ -284,14 +284,24 @@ func (p *DiscogsProvider) GetCoverArt(artist, album string) ([]models.CoverArtCa
 	}
 
 	var results []models.CoverArtCandidate
+	// For each candidate, if we want dimensions we'd need to fetch details for EACH.
+	// To avoid rate limiting, let's just use what we have in Search or maybe just fetch details for the TOP result.
+	// Actually, Discogs Search results include 'cover_image' but NO dimensions.
+	// But our API allows choosing.
+
 	for _, c := range candidates {
 		if coverImage, ok := c.Metadata["coverImage"].(string); ok && coverImage != "" {
-			results = append(results, models.CoverArtCandidate{
+			candidate := models.CoverArtCandidate{
 				Source:    "Discogs",
 				URL:       coverImage,
 				Thumbnail: coverImage,
 				Size:      "full",
-			})
+			}
+
+			// If we ever add dimensions to Metadata in Search, we'd pick them up here.
+			// Discogs doesn't provide them in search results.
+
+			results = append(results, candidate)
 		}
 		if thumb, ok := c.Metadata["thumbnail"].(string); ok && thumb != "" {
 			results = append(results, models.CoverArtCandidate{

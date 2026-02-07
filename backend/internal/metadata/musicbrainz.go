@@ -3,6 +3,7 @@ package metadata
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -254,25 +255,64 @@ func (p *MusicBrainzProvider) GetCoverArt(artist, album string) ([]models.CoverA
 
 	coverReleaseID := string(rg.Releases[0].ID)
 
-	coverURL := fmt.Sprintf("%s/release/%s/front", musicBrainzCoverURL, coverReleaseID)
-
-	// Head request to check validity using our global transport implicitly
-	resp, err := http.Head(coverURL)
+	// Fetch JSON metadata from Cover Art Archive
+	metadataURL := fmt.Sprintf("%s/release/%s", musicBrainzCoverURL, coverReleaseID)
+	resp, err := http.Get(metadataURL)
 	if err != nil {
-		return []models.CoverArtCandidate{}, nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return []models.CoverArtCandidate{}, nil
+		// Fallback to simple /front if JSON not available (might happen for some releases)
+		frontURL := fmt.Sprintf("%s/release/%s/front", musicBrainzCoverURL, coverReleaseID)
+		return []models.CoverArtCandidate{
+			{
+				Source:    "MusicBrainz",
+				URL:       frontURL,
+				Thumbnail: frontURL + "-250",
+				Size:      "full",
+			},
+		}, nil
 	}
 
-	return []models.CoverArtCandidate{
-		{
+	var data struct {
+		Images []struct {
+			Image      string            `json:"image"`
+			Thumbnails map[string]string `json:"thumbnails"`
+			Front      bool              `json:"front"`
+			Types      []string          `json:"types"`
+		} `json:"images"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+
+	var results []models.CoverArtCandidate
+	for _, img := range data.Images {
+		if !img.Front {
+			continue
+		}
+
+		// CAA JSON doesn't always provide dimensions directly in the main Images list,
+		// but we know the 'image' is the original.
+		// Some implementations of CAA API might include dimensions in a 'types' or metadata block,
+		// but usually we just serve the URL.
+		// However, we can at least provide the 1200 thumbnail if it exists as a "high quality" option.
+
+		thumb := img.Thumbnails["small"]
+		if thumb == "" {
+			thumb = img.Thumbnails["250"]
+		}
+
+		results = append(results, models.CoverArtCandidate{
 			Source:    "MusicBrainz",
-			URL:       coverURL,
-			Thumbnail: coverURL + "-250",
+			URL:       img.Image,
+			Thumbnail: thumb,
 			Size:      "full",
-		},
-	}, nil
+		})
+	}
+
+	return results, nil
 }

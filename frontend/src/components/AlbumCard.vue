@@ -80,6 +80,9 @@
       <div v-if="loading && isVisible" class="absolute top-2 right-2">
         <div class="animate-spin h-4 w-4 border-2 border-primary-500 border-t-transparent rounded-full"></div>
       </div>
+      <div v-if="isBusy && isVisible" class="absolute top-2 right-2 bg-yellow-500/20 text-yellow-500 text-[10px] px-1 rounded animate-pulse">
+        BUSY
+      </div>
     </div>
 
     <!-- Basic Info (always visible) & Lazy Metadata -->
@@ -142,6 +145,7 @@ import { ref, onMounted, onUnmounted, watch, computed, onBeforeUnmount } from 'v
 import { useRouter } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
 import { generateHashColor } from '@/utils/color'
+import { albumBatchLoader } from '@/services/albumBatchLoader'
 import axios from 'axios'
 import MetadataStatusBadge from './MetadataStatusBadge.vue'
 
@@ -180,6 +184,7 @@ const mpdStore = useMpdStore()
 const cardRef = ref(null)
 const isVisible = ref(false)
 const loading = ref(false)
+const isBusy = ref(false)
 const fullDetails = ref(null)
 const showOverlay = ref(false)
 const overlayTimer = ref(null)
@@ -221,6 +226,7 @@ const expanded = ref(false)
 const imageLoaded = ref(false)
 const currentImageSrc = ref('')
 const usingFolderUrl = ref(false)
+const folderUrlChecked = ref(false)
 
 // Generate consistent background color
 const bgColor = computed(() => {
@@ -247,6 +253,7 @@ const buildFolderUrl = (path) => {
 const checkFolderExists = (url) => {
     fetch(url, { method: 'HEAD' })
         .then(response => {
+            folderUrlChecked.value = true
             if (response.status === 404) {
                 console.log('[AlbumCard] Folder URL not found (404), switching to API')
                 fallbackToApi()
@@ -254,6 +261,7 @@ const checkFolderExists = (url) => {
             // If 200+, folder URL works, keep it
         })
         .catch(() => {
+            folderUrlChecked.value = true
             // Network error - fallback to API
             fallbackToApi()
         })
@@ -281,6 +289,7 @@ const resolveImageSource = () => {
     console.log('[AlbumCard] Using folder URL:', folderUrl)
     currentImageSrc.value = folderUrl
     usingFolderUrl.value = true
+    folderUrlChecked.value = false
     
     // 3. In background, check if it returns 404
     checkFolderExists(folderUrl)
@@ -321,6 +330,7 @@ watch(() => props.albumDetails, (newVal) => {
         initData()
         // Reset state when new data arrives
         usingFolderUrl.value = false
+        folderUrlChecked.value = false
         resolveImageSource()
     }
 }, { deep: true, immediate: true })
@@ -344,17 +354,22 @@ const fetchDetails = async () => {
   if (loading.value) return
   
   loading.value = true
+  isBusy.value = false
   try {
-    // Use mpdStore to leverage cache (stale-while-revalidate pattern)
-    const response = await mpdStore.fetchAlbumSongs(props.artist, props.album)
-    if (response && response.album) {
-      fullDetails.value = response
+    // Use batch loader to coordinate requests and handle throttling
+    const response = await albumBatchLoader.requestDetails(props.artist, props.album)
+    if (response && response.data) {
+      fullDetails.value = response.data
       resolveImageSource()
     }
   } catch (error) {
-    console.error('Failed to fetch album details:', error)
-    // Even if fetch fails, try to show something if we have props
-    fallbackToApi()
+    if (error.response && error.response.status === 429) {
+      isBusy.value = true
+    } else {
+      console.error('Failed to fetch album details:', error)
+      // Even if fetch fails, try to show something if we have props
+      fallbackToApi()
+    }
   } finally {
     loading.value = false
   }

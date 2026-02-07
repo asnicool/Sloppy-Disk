@@ -189,33 +189,84 @@ func HandleAlbumDetails(w http.ResponseWriter, r *http.Request) {
 	albumName, _ := url.PathUnescape(vars["album"])
 
 	if artist == "" || albumName == "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(models.APIResponse{
-			Success: false,
-			Error:   "Artist and Album are required",
-		})
+		SendError(w, http.StatusBadRequest, "Artist and Album are required")
 		return
 	}
 
+	cache := albumcache.GetCache()
+	if data, ok := cache.GetAlbumDetails(artist, albumName); ok {
+		SendJSON(w, models.APIResponse{Success: true, Data: data})
+		return
+	}
+
+	var data map[string]interface{}
+	err := MPDCircuitBreaker.Execute(r.Context(), func() error {
+		var execErr error
+		data, execErr = fetchDetailedAlbumInfo(artist, albumName)
+		return execErr
+	})
+
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	cache.SetAlbumDetails(artist, albumName, data)
+	SendJSON(w, models.APIResponse{Success: true, Data: data})
+}
+
+type BatchDetailsRequest struct {
+	Albums []struct {
+		Artist string `json:"artist"`
+		Album  string `json:"album"`
+	} `json:"albums"`
+}
+
+// HandleAlbumDetailsBatch handles /api/albums/details/batch
+func HandleAlbumDetailsBatch(w http.ResponseWriter, r *http.Request) {
+	var req BatchDetailsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		SendError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	results := make(map[string]interface{})
+	cache := albumcache.GetCache()
+
+	for _, a := range req.Albums {
+		key := fmt.Sprintf("%s|%s", a.Artist, a.Album)
+		if data, ok := cache.GetAlbumDetails(a.Artist, a.Album); ok {
+			results[key] = data
+		} else {
+			// Fetch individually but inside the loop
+			// The MPD client semaphore will throttle these requests
+			data, err := fetchDetailedAlbumInfo(a.Artist, a.Album)
+			if err == nil {
+				cache.SetAlbumDetails(a.Artist, a.Album, data)
+				results[key] = data
+			} else {
+				log.Printf("Failed to fetch batch details for %s - %s: %v", a.Artist, a.Album, err)
+			}
+		}
+	}
+
+	SendJSON(w, models.APIResponse{
+		Success: true,
+		Data:    results,
+	})
+}
+
+func fetchDetailedAlbumInfo(artist, albumName string) (map[string]interface{}, error) {
 	// Fetch songs for this album
 	// Use find as it's more precise than search
 	albumEsc := strings.ReplaceAll(albumName, "\"", "\\\"")
 	artistEsc := strings.ReplaceAll(artist, "\"", "\\\"")
 
 	// We'll try to find by album and artist
-	// In some cases artist might be AlbumArtist, so we search both if needed, but for now let's keep it simple
 	cmd := fmt.Sprintf("find album \"%s\" artist \"%s\"", albumEsc, artistEsc)
 	resp, err := mpd.GetClient().SendCommand(cmd)
 	if err != nil {
-		log.Printf("Error searching songs for album %s by %s: %v", albumName, artist, err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(models.APIResponse{
-			Success: false,
-			Error:   "Failed to fetch album details",
-		})
-		return
+		return nil, fmt.Errorf("error searching songs for album %s by %s: %v", albumName, artist, err)
 	}
 
 	songs := parseSongs(resp)
@@ -229,13 +280,7 @@ func HandleAlbumDetails(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(songs) == 0 {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(models.APIResponse{
-			Success: false,
-			Error:   "Album not found",
-		})
-		return
+		return nil, fmt.Errorf("album not found")
 	}
 
 	// Compute stats
@@ -276,25 +321,20 @@ func HandleAlbumDetails(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Prepare data to include both summary and tracklist
-	data := map[string]interface{}{
+	return map[string]interface{}{
 		"album":  albumInfo,
 		"tracks": songs,
-	}
-
-	SendJSON(w, models.APIResponse{
-		Success: true,
-		Data:    data,
-	})
+	}, nil
 }
 
 // HandleAllAlbums handles /api/albums/all
 // Returns all albums from the cache for local search/filtering
 func HandleAllAlbums(w http.ResponseWriter, r *http.Request) {
 	cache := albumcache.GetCache()
-	
+
 	// Get all albums from cache
 	allAlbums := cache.GetAllAlbums()
-	
+
 	response := models.APIResponse{
 		Success: true,
 		Data:    allAlbums,

@@ -129,3 +129,24 @@ Backend starting on port 7070
 2026/02/06 22:14:46 Random buffer appended 1 items. Size: 120
 2026/02/06 22:15:42 [MPD] CommandList (2 cmds) took 1.538006495s
 2026/02/06 22:17:44 [MPD] CommandList (2 cmds) took 199.750469ms
+2026/02/06 23:49:28 [Broadcaster] Subsystems changed: [update]
+2026/02/06 23:49:28 [Broadcaster] Broadcasting status update (playlist version: 2377)
+2026/02/06 23:49:37 [Broadcaster] Subsystems changed: [update]
+2026/02/06 23:49:37 [Broadcaster] Broadcasting status update (playlist version: 2377)
+2026/02/06 23:54:36 [Broadcaster] Subsystems changed: [update]
+2026/02/06 23:54:36 [Broadcaster] Broadcasting status update (playlist version: 2377)
+2026/02/06 23:54:36 [Broadcaster] Subsystems changed: [update]
+2026/02/06 23:54:36 [Broadcaster] Broadcasting status update (playlist version: 2377)
+2026/02/07 00:01:37 [Broadcaster] Subsystems changed: [update]
+2026/02/07 00:01:37 [Broadcaster] Broadcasting status update (playlist version: 2377)
+2026/02/07 00:01:37 [Broadcaster] Subsystems changed: [update]
+2026/02/07 00:01:37 [Broadcaster] Broadcasting status update (playlist version: 2377)
+2026/02/07 00:03:35 [Broadcaster] Subsystems changed: [update]
+2026/02/07 00:03:35 [Broadcaster] Broadcasting status update (playlist version: 2377)
+2026/02/07 00:03:36 [Broadcaster] Subsystems changed: [update]
+2026/02/07 00:03:36 [Broadcaster] Broadcasting status update (playlist version: 2377)
+2026/02/07 00:03:52 [Broadcaster] Subsystems changed: [update]
+2026/02/07 00:03:52 [Broadcaster] Broadcasting status update (playlist version: 2377)
+2026/02/07 00:03:52 [Broadcaster] Subsystems changed: [update]
+2026/02/07 00:03:52 [Broadcaster] Broadcasting status update (playlist version: 2377)
+2026/02/07 00:07:11 WebSocket read error: read tcp 192.168.1.111:7070->192.168.1.19:52142: i/o timeout

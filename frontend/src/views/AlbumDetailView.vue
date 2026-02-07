@@ -10,7 +10,7 @@
       <div class="w-48 h-48 bg-neutral-800 rounded-lg flex items-center justify-center relative group overflow-hidden shadow-2xl flex-shrink-0">
         <img 
           v-if="albumDetails?.coverUrl" 
-          :src="albumDetails.coverUrl" 
+          :src="albumDetails.coverUrl + (coverBust ? '?t=' + coverBust : '')" 
           :alt="albumName"
           class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
@@ -80,6 +80,15 @@
                 <span>Add to Queue</span>
              </button>
              
+             <div v-if="albumDetails?.isOverlayActive" class="flex items-center space-x-2 text-amber-500 bg-amber-500 bg-opacity-10 px-3 py-1 rounded border border-amber-500 border-opacity-20">
+                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-xs font-medium">Out of Sync</span>
+                <button @click="reapplyMetadata" class="text-xs font-bold hover:underline ml-2">Reapply</button>
+             </div>
+
              <button @click="searchMetadata" class="ml-auto text-sm text-neutral-400 hover:text-white px-3 py-2 rounded border border-neutral-700 hover:border-neutral-500 transition-colors">
                 Metadata
             </button>
@@ -150,33 +159,52 @@
        :duration="albumDetails?.duration"
        @close="showMetadataModal = false"
        @applied="handleMetadataApplied"
+       @cover-updated="handleCoverUpdated"
      />
 
     <!-- Cover Picker Modal -->
-    <div v-if="showCoverPicker" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div class="bg-neutral-800 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col">
-        <div class="p-6 border-b border-neutral-700 flex justify-between items-center">
-          <h2 class="text-xl font-bold text-white">Pick Cover Art</h2>
-          <button @click="showCoverPicker = false" class="text-neutral-400 hover:text-white">&times;</button>
-        </div>
-        <div class="p-6 overflow-y-auto flex-1">
-          <div v-if="fetchingCovers" class="text-center py-8 text-neutral-400">Fetching covers...</div>
-          <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div
-              v-for="cover in coverCandidates"
-              :key="cover.url"
-              class="relative aspect-square bg-neutral-700 rounded overflow-hidden group cursor-pointer"
-              @click="selectCover(cover)"
-            >
-              <img :src="cover.url" class="w-full h-full object-cover" alt="Cover candidate">
-              <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <span class="text-white text-xs">{{ cover.size }}</span>
+    <BaseModal
+      v-model="showCoverPicker"
+      title="Pick Cover Art"
+    >
+      <div class="space-y-6">
+        <div v-if="fetchingCovers" class="text-center py-8 text-neutral-400">Fetching covers...</div>
+        <div v-else class="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div
+                v-for="(cover, idx) in coverCandidates"
+                :key="idx"
+                class="aspect-square relative group cursor-pointer rounded-lg overflow-hidden bg-neutral-900 border border-neutral-800 hover:border-blue-500 transition-colors"
+                @click="selectCover(cover)"
+              >
+                <img :src="cover.thumbnail || cover.url" class="w-full h-full object-cover" />
+                
+                <!-- Dimension Badge -->
+                <div v-if="cover.width && cover.height" class="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/70 backdrop-blur-md rounded text-[9px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                  {{ cover.width }}x{{ cover.height }}
+                </div>
+
+                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span class="text-xs font-bold text-white uppercase tracking-wider">Select</span>
+                </div>
               </div>
-            </div>
-          </div>
         </div>
       </div>
-    </div>
+    </BaseModal>
+
+    <!-- Confirmation Modal -->
+    <BaseConfirmModal
+      v-model="showConfirmModal"
+      title="Update Cover Art"
+      message="Set this as album cover art? This will update the folder image on disk."
+      confirm-label="Set Cover"
+      :loading="applyingCover"
+      @confirm="handleConfirmCover"
+      @cancel="showConfirmModal = false"
+    >
+      <div v-if="pendingCover" class="aspect-square w-32 mx-auto rounded-lg overflow-hidden border border-neutral-700 shadow-xl">
+        <img :src="pendingCover.url" class="w-full h-full object-cover" />
+      </div>
+    </BaseConfirmModal>
   </div>
 </template>
 
@@ -185,6 +213,8 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
 import BaseToast from '@/components/BaseToast.vue'
+import BaseModal from '@/components/BaseModal.vue'
+import BaseConfirmModal from '@/components/BaseConfirmModal.vue'
 import MetadataSearchModal from '@/components/MetadataSearchModal.vue'
 
 const route = useRoute()
@@ -205,6 +235,12 @@ const metadataCandidates = ref([])
 const showCoverPicker = ref(false)
 const fetchingCovers = ref(false)
 const coverCandidates = ref([])
+const coverBust = ref(0)
+
+// Confirmation Modal
+const showConfirmModal = ref(false)
+const pendingCover = ref(null)
+const applyingCover = ref(false)
 
 // Toast Notification
 const showToast = ref(false)
@@ -320,8 +356,33 @@ const searchMetadata = async () => {
 
 const handleMetadataApplied = (result) => {
   showNotification(`Metadata applied to ${result.updatedFiles} files`, 'success')
+  // Cache bust local cover if coverArtUrl was provided
+  if (result.coverArtUrl) {
+    coverBust.value = Date.now()
+  }
   // Refresh album details to show updated metadata
   fetchAlbumDetails()
+}
+
+const handleCoverUpdated = () => {
+  showNotification('Cover art updated successfully')
+  coverBust.value = Date.now()
+  fetchAlbumDetails()
+}
+
+const reapplyMetadata = async () => {
+  const overlay = mpdStore.albumCache.getOverlay(artistName.value, albumName.value)
+  if (overlay && overlay.originalMetadata) {
+    try {
+      selectionMetadata.value = true // Reusing searching state
+      const result = await mpdStore.applyMetadata(albumPath.value, overlay.originalMetadata)
+      handleMetadataApplied(result)
+    } catch (error) {
+      showNotification('Reapply failed: ' + error.message, 'error')
+    } finally {
+      selectionMetadata.value = false
+    }
+  }
 }
 
 const fetchCovers = async () => {
@@ -337,16 +398,31 @@ const fetchCovers = async () => {
 }
 
 const selectCover = async (cover) => {
-  if (confirm('Set this as album cover?')) {
-    try {
-      // We need the album path. For now using a placeholder or deriving from tracks
-      const albumPath = tracks.value[0]?.path.split('/').slice(0, -1).join('/')
-      await mpdStore.applyCoverArt(albumPath, cover.url)
-      alert('Cover art updated')
-      showCoverPicker.value = false
-    } catch (error) {
-      alert('Failed to update cover art')
-    }
+  pendingCover.value = cover
+  showConfirmModal.value = true
+}
+
+const handleConfirmCover = async () => {
+  if (!pendingCover.value) return
+  
+  applyingCover.value = true
+  try {
+    const albumPath = tracks.value[0]?.path.split('/').slice(0, -1).join('/')
+    await mpdStore.applyCoverArt(albumPath, pendingCover.value.url)
+    showNotification('Cover art updated successfully')
+    showCoverPicker.value = false
+    showConfirmModal.value = false
+    
+    // Cache bust local cover
+    coverBust.value = Date.now()
+    
+    // Refresh album details
+    await fetchAlbumDetails()
+  } catch (error) {
+    showNotification('Failed to update cover art: ' + error.message, 'error')
+  } finally {
+    applyingCover.value = false
+    pendingCover.value = null
   }
 }
 

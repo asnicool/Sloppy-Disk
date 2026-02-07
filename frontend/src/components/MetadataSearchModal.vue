@@ -1,160 +1,294 @@
 <template>
-  <Teleport to="body">
-    <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center">
-      <!-- Backdrop -->
-      <div class="absolute inset-0 bg-black/50" @click="$emit('close')"></div>
-
-      <!-- Modal -->
-      <div class="relative bg-gray-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        <!-- Header -->
-        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-          <h3 class="text-lg font-semibold text-white">Find Metadata</h3>
-          <button @click="$emit('close')" class="text-gray-400 hover:text-white">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
-
-        <!-- Content -->
-        <div class="overflow-y-auto max-h-[calc(90vh-140px)] p-4">
-          <!-- Search Form -->
-          <div class="mb-4 flex gap-2">
+  <BaseModal
+    :model-value="isOpen"
+    @update:model-value="$emit('close')"
+    title="Find Metadata & Cover Art"
+    class="metadata-modal"
+  >
+    <div class="space-y-6">
+      <!-- Search Form -->
+      <div class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-1">
+            <label class="text-xs font-medium text-neutral-500 uppercase">Artist</label>
             <input
               v-model="displayArtist"
               placeholder="Artist"
-              class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-400"
+              class="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+              @keyup.enter="handleSearch"
             />
+          </div>
+          <div class="space-y-1">
+            <label class="text-xs font-medium text-neutral-500 uppercase">Album</label>
             <input
               v-model="displayAlbum"
               placeholder="Album"
-              class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-400"
+              class="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+              @keyup.enter="handleSearch"
             />
-            <button
-              @click="handleSearch"
-              :disabled="loading || !displayArtist || !displayAlbum"
-              class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          </div>
+        </div>
+        
+        <button
+          @click="handleSearch"
+          :disabled="loading || !displayArtist || !displayAlbum"
+          class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          <svg v-if="loading" class="animate-spin h-5 w-5" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          {{ loading ? 'Searching...' : 'Search Metadata' }}
+        </button>
+      </div>
+
+      <!-- Provider Filter -->
+      <div class="flex flex-wrap gap-2">
+        <button
+          v-for="provider in providers"
+          :key="provider"
+          @click="toggleProvider(provider)"
+          :class="[
+            'px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-200 border',
+            isProviderSelected(provider)
+              ? 'bg-blue-600/10 border-blue-500 text-blue-400'
+              : 'bg-neutral-900 border-neutral-700 text-neutral-500 hover:border-neutral-500 hover:text-neutral-300'
+          ]"
+        >
+          {{ provider }}
+        </button>
+      </div>
+
+      <!-- Manual Cover Input -->
+      <div class="space-y-2">
+        <h4 class="text-xs font-medium text-neutral-500 uppercase">Manual Cover Art</h4>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="md:col-span-3 space-y-2">
+            <div 
+              class="relative border-2 border-dashed border-neutral-700 rounded-xl p-4 transition-colors hover:border-neutral-500 group flex flex-col items-center justify-center min-h-[120px]"
+              :class="{ 'border-blue-500 bg-blue-500/5': isDragging }"
+              @dragover.prevent="isDragging = true"
+              @dragleave.prevent="isDragging = false"
+              @drop.prevent="handleDrop"
             >
-              {{ loading ? 'Searching...' : 'Search' }}
-            </button>
-          </div>
-
-          <!-- Provider Filter -->
-          <div class="mb-4 flex gap-2 flex-wrap">
-            <button
-              v-for="provider in providers"
-              :key="provider"
-              @click="toggleProvider(provider)"
-              :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200',
-                isProviderSelected(provider)
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
-              ]"
-            >
-              {{ provider }}
-            </button>
-          </div>
-
-          <!-- Error -->
-          <div v-if="error" class="mb-4 p-3 bg-red-900/50 border border-red-700 rounded text-red-200">
-            {{ error }}
-          </div>
-
-          <!-- Results -->
-          <div v-if="candidates.length > 0" class="space-y-2">
-            <h4 class="text-sm font-medium text-gray-400">Search Results ({{ candidates.length }})</h4>
+              <input 
+                type="file" 
+                ref="fileInput" 
+                class="hidden" 
+                accept="image/*" 
+                @change="handleFileSelect"
+              />
+              <div v-if="!uploadedFile" class="text-center space-y-2">
+                <svg class="w-8 h-8 text-neutral-600 mx-auto group-hover:text-neutral-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                <p class="text-sm text-neutral-500">
+                  <button @click="fileInput.click()" class="text-blue-500 hover:underline font-bold">Upload a file</button>
+                  or drag and drop
+                </p>
+              </div>
+              <div v-else class="flex items-center gap-3 w-full">
+                <div class="w-16 h-16 rounded overflow-hidden flex-shrink-0 bg-neutral-800">
+                  <img :src="uploadedFileUrl" class="w-full h-full object-cover" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm text-white font-medium truncate">{{ uploadedFile.name }}</p>
+                  <p class="text-xs text-neutral-500">{{ (uploadedFile.size / 1024).toFixed(1) }} KB</p>
+                </div>
+                <button @click="clearUpload" class="text-neutral-500 hover:text-red-500">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
             
+            <input
+              v-model="manualCoverUrl"
+              placeholder="Paste image URL here..."
+              class="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
+            />
+          </div>
+          <div class="flex flex-col gap-2">
+             <button
+              @click="handleApplyManualCover"
+              :disabled="applying || (!manualCoverUrl && !uploadedFile)"
+              class="h-full px-4 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold transition-all disabled:opacity-50"
+            >
+              Apply Cover
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <hr class="border-neutral-800" />
+
+      <!-- Results -->
+      <div v-if="candidates.length > 0" class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h4 class="text-xs font-medium text-neutral-500 uppercase">Search Results ({{ candidates.length }})</h4>
+        </div>
+        
+        <div class="grid grid-cols-1 gap-3">
+          <div
+            v-for="candidate in candidates"
+            :key="`${candidate.source}-${candidate.externalId}`"
+            class="group"
+          >
             <div
-              v-for="(candidate, index) in candidates"
-              :key="`${candidate.source}-${candidate.externalId}`"
               @click="selectCandidate(candidate)"
               :class="[
-                'p-3 rounded cursor-pointer transition-colors',
+                'p-4 rounded-xl cursor-pointer transition-all border',
                 selectedCandidate?.externalId === candidate.externalId && selectedCandidate?.source === candidate.source
-                  ? 'bg-blue-900/50 border border-blue-700'
-                  : 'bg-gray-800 border border-gray-700 hover:bg-gray-750'
+                  ? 'bg-blue-600/10 border-blue-500/50 shadow-lg shadow-blue-900/10'
+                  : 'bg-neutral-800/50 border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600'
               ]"
             >
               <div class="flex justify-between items-start">
-                <div>
-                  <div class="font-medium text-white">{{ candidate.album }}</div>
-                  <div class="text-sm text-gray-400">{{ candidate.artist }}</div>
-                  <div class="text-xs text-gray-500 mt-1">
-                    {{ candidate.year }} · {{ candidate.genre || 'No genre' }} · {{ candidate.source }}
+                <div class="min-w-0">
+                  <div class="font-bold text-white truncate">{{ candidate.album }}</div>
+                  <div class="text-sm text-neutral-400 truncate">{{ candidate.artist }}</div>
+                  <div class="flex items-center gap-2 mt-2">
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-300 uppercase leading-none">
+                      {{ candidate.source }}
+                    </span>
+                    <span v-if="candidate.year" class="text-xs text-neutral-500">{{ candidate.year }}</span>
+                    <span v-if="candidate.genre" class="text-xs text-neutral-500 truncate max-w-[100px] border-l border-neutral-700 pl-2">
+                      {{ candidate.genre }}
+                    </span>
                   </div>
                 </div>
-                <div class="text-right">
-                  <div class="text-lg font-bold text-blue-400">{{ Math.round(candidate.confidence) }}%</div>
-                  <div v-if="candidate.tracks" class="text-xs text-gray-500">
+                <div class="text-right flex-shrink-0">
+                  <div :class="[
+                    'text-xl font-black italic',
+                    candidate.confidence > 80 ? 'text-green-500' : candidate.confidence > 50 ? 'text-amber-500' : 'text-neutral-500'
+                  ]">
+                    {{ Math.round(candidate.confidence) }}%
+                  </div>
+                  <div v-if="candidate.tracks" class="text-[10px] text-neutral-600 font-bold uppercase mt-1">
                     {{ candidate.tracks.length }} tracks
                   </div>
                 </div>
               </div>
 
               <!-- Selected Details -->
-              <div v-if="selectedCandidate?.externalId === candidate.externalId && selectedCandidate?.source === candidate.source" class="mt-3 pt-3 border-t border-gray-700">
-                <div v-if="selectedCandidate.tracks && selectedCandidate.tracks.length > 0" class="mb-2">
-                  <div class="text-xs text-gray-500 mb-1">Tracks:</div>
-                  <div class="max-h-32 overflow-y-auto space-y-1">
-                    <div v-for="track in selectedCandidate.tracks.slice(0, 10)" :key="track.track" class="text-sm text-gray-300 flex gap-2">
-                      <span class="text-gray-500">{{ track.disc }}-{{ track.track }}</span>
-                      <span class="flex-1 truncate">{{ track.title }}</span>
-                    </div>
-                    <div v-if="selectedCandidate.tracks.length > 10" class="text-xs text-gray-500">
-                      ... and {{ selectedCandidate.tracks.length - 10 }} more
+              <div v-if="selectedCandidate?.externalId === candidate.externalId && selectedCandidate?.source === candidate.source" class="mt-6 space-y-6 animate-in slide-in-from-top-2 duration-300">
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-neutral-500 uppercase">Album</label>
+                    <input v-model="selectedCandidate.album" class="w-full px-2 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-sm text-white focus:border-blue-500 outline-none"/>
+                  </div>
+                  <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-neutral-500 uppercase">Artist</label>
+                    <input v-model="selectedCandidate.artist" class="w-full px-2 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-sm text-white focus:border-blue-500 outline-none"/>
+                  </div>
+                  <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-neutral-500 uppercase">Year</label>
+                    <input v-model="selectedCandidate.year" class="w-full px-2 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-sm text-white focus:border-blue-500 outline-none"/>
+                  </div>
+                  <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-neutral-500 uppercase">Genre</label>
+                    <input v-model="selectedCandidate.genre" class="w-full px-2 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-sm text-white focus:border-blue-500 outline-none"/>
+                  </div>
+                </div>
+
+                <!-- Tracks List -->
+                <div v-if="selectedCandidate.tracks?.length" class="space-y-2">
+                  <div class="text-[10px] font-bold text-neutral-500 uppercase">Track Matching</div>
+                  <div class="max-h-60 overflow-y-auto rounded-lg border border-neutral-700/50 bg-neutral-900/50 divide-y divide-neutral-800">
+                    <div v-for="track in selectedCandidate.tracks" :key="track.track" class="flex gap-4 items-center p-2 group/track">
+                       <span class="text-xs font-mono text-neutral-600 group-hover/track:text-blue-500 transition-colors">
+                        {{ track.disc ? track.disc + '-' : '' }}{{ track.track.toString().padStart(2, '0') }}
+                      </span>
+                      <input v-model="track.title" class="flex-1 bg-transparent border-none text-xs text-white p-0 focus:ring-0 placeholder-neutral-700" placeholder="Unnamed Track"/>
                     </div>
                   </div>
                 </div>
 
                 <!-- Cover Art -->
-                <div v-if="coverArtOptions.length > 0" class="mb-2">
-                  <div class="text-xs text-gray-500 mb-1">Cover Art:</div>
-                  <div class="flex gap-2 flex-wrap">
-                    <img
-                      v-for="(art, idx) in coverArtOptions.slice(0, 4)"
+                <div v-if="coverArtOptions.length > 0" class="space-y-2">
+                  <div class="text-[10px] font-bold text-neutral-500 uppercase">Cover Selection</div>
+                  <div class="flex gap-3 flex-wrap">
+                    <div
+                      v-for="(art, idx) in coverArtOptions.slice(0, 6)"
                       :key="idx"
-                      :src="art.thumbnail || art.url"
-                      :class="[
-                        'w-16 h-16 object-cover rounded cursor-pointer border-2',
-                        selectedCoverArt?.url === art.url ? 'border-blue-500' : 'border-transparent'
-                      ]"
+                      class="relative w-24 h-24 group/art rounded-lg overflow-hidden cursor-pointer"
                       @click.stop="selectedCoverArt = art"
-                    />
+                    >
+                      <img
+                        :src="art.thumbnail || art.url"
+                        :class="[
+                          'w-full h-full object-cover transition-all duration-300',
+                          selectedCoverArt?.url === art.url ? 'ring-2 ring-blue-500 scale-105' : 'opacity-60 grayscale hover:opacity-100 hover:grayscale-0'
+                        ]"
+                      />
+                      <!-- Dimension Badge -->
+                      <div v-if="art.width && art.height" class="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/70 backdrop-blur-md rounded text-[9px] font-bold text-white opacity-0 group-hover/art:opacity-100 transition-opacity">
+                        {{ art.width }}x{{ art.height }}
+                      </div>
+                      
+                      <div v-if="selectedCoverArt?.url === art.url" class="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <button
-                  @click.stop="handleApply"
-                  :disabled="applying"
-                  class="w-full mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                >
-                  {{ applying ? 'Applying...' : 'Apply Metadata' }}
-                </button>
-
-                <div v-if="applyResult" class="mt-2 p-2 bg-green-900/30 border border-green-700 rounded text-sm text-green-200">
-                  Applied to {{ applyResult.updatedFiles }} of {{ applyResult.totalFiles }} files
-                  <span v-if="applyResult.errors && applyResult.errors.length > 0" class="text-yellow-400">
-                    ({{ applyResult.errors.length }} errors)
-                  </span>
+                <div class="pt-2">
+                  <button
+                    @click.stop="handleApply"
+                    :disabled="applying"
+                    class="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black uppercase tracking-wider transition-all shadow-lg shadow-green-900/20 disabled:opacity-50"
+                  >
+                    {{ applying ? 'Tagging Files...' : 'Apply All changes' }}
+                  </button>
+                  
+                  <div v-if="applyResult" class="mt-4 p-4 bg-green-900/20 border border-green-500/30 rounded-xl">
+                    <div class="flex items-center gap-2 text-green-400 font-bold text-sm">
+                      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                      </svg>
+                      Update Successful
+                    </div>
+                    <p class="text-xs text-neutral-400 mt-1">
+                      Applied to {{ applyResult.updatedFiles }} of {{ applyResult.totalFiles }} files.
+                    </p>
+                    <div v-if="applyResult.errors?.length" class="mt-2 space-y-1">
+                      <div v-for="(err, idx) in applyResult.errors" :key="idx" class="text-[10px] text-amber-500 font-medium">
+                        ⚠ {{ err }}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-
-          <!-- No Results -->
-          <div v-else-if="searched && !loading" class="text-center py-8 text-gray-500">
-            No metadata found. Try adjusting your search terms.
-          </div>
         </div>
       </div>
+
+      <!-- No Results / Initial State -->
+      <div v-else-if="searched && !loading" class="py-12 text-center space-y-2">
+        <svg class="w-12 h-12 text-neutral-800 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 9.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p class="text-neutral-500 font-medium">No metadata found for this search.</p>
+        <button @click="clearSearch" class="text-xs text-blue-500 hover:underline">Clear search terms</button>
+      </div>
+      
+      <div v-else-if="!searched && !loading" class="py-12 text-center text-neutral-600">
+        Enter search terms to find metadata and high-res cover art.
+      </div>
     </div>
-  </Teleport>
+  </BaseModal>
 </template>
 
 <script setup>
-import { ref, watch, nextTick, computed } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useMetadata } from '../composables/useMetadata'
+import { useMpdStore } from '../stores/mpdStore'
+import BaseModal from './BaseModal.vue'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -165,8 +299,9 @@ const props = defineProps({
   duration: Number
 })
 
-const emit = defineEmits(['close', 'applied'])
+const emit = defineEmits(['close', 'applied', 'coverUpdated'])
 
+const mpdStore = useMpdStore()
 const {
   candidates,
   selectedCandidate,
@@ -188,6 +323,13 @@ const coverArtOptions = ref([])
 const selectedCoverArt = ref(null)
 const applying = ref(false)
 const searched = ref(false)
+
+// Manual Cover State
+const manualCoverUrl = ref('')
+const isDragging = ref(false)
+const uploadedFile = ref(null)
+const uploadedFileUrl = ref(null)
+const fileInput = ref(null)
 
 // Display value for inputs
 const displayArtist = computed({
@@ -220,19 +362,17 @@ const handleSearch = async () => {
   )
   
   // Also search for cover art
-  coverArtOptions.value = await searchCoverArt(artist, album)
+  const results = await searchCoverArt(artist, album)
+  coverArtOptions.value = results
 }
 
 const selectCandidate = async (candidate) => {
   if (selectedCandidate.value?.externalId === candidate.externalId && selectedCandidate.value?.source === candidate.source) {
-    // Deselect
     selectedCandidate.value = null
     return
   }
   
   selectedCandidate.value = candidate
-  
-  // Get detailed info
   await getMetadataDetails(candidate.source, candidate.externalId)
 }
 
@@ -240,16 +380,81 @@ const handleApply = async () => {
   if (!selectedCandidate.value || !props.albumPath) return
   
   applying.value = true
-  const result = await applyMetadata(
-    props.albumPath,
-    selectedCandidate.value,
-    selectedCoverArt.value?.url || ''
-  )
-  applying.value = false
-  
-  if (result) {
-    emit('applied', result)
+  try {
+    const result = await applyMetadata(
+      props.albumPath,
+      selectedCandidate.value,
+      selectedCoverArt.value?.url || ''
+    )
+    if (result) {
+      emit('applied', result)
+    }
+  } catch (e) {
+    console.error('Failed to apply metadata:', e)
+  } finally {
+    applying.value = false
   }
+}
+
+const handleApplyManualCover = async () => {
+  if (!props.albumPath) return
+  
+  applying.value = true
+  try {
+    if (uploadedFile.value) {
+      await mpdStore.uploadCoverArt(props.albumPath, uploadedFile.value)
+    } else if (manualCoverUrl.value) {
+      await mpdStore.applyCoverArt(props.albumPath, manualCoverUrl.value)
+    }
+    emit('coverUpdated')
+    manualCoverUrl.value = ''
+    clearUpload()
+  } catch (e) {
+    console.error('Failed to apply manual cover:', e)
+  } finally {
+    applying.value = false
+  }
+}
+
+// Drag & Drop Handlers
+const handleDrop = (e) => {
+  isDragging.value = false
+  const files = e.dataTransfer.files
+  if (files && files.length > 0) {
+    processFile(files[0])
+  }
+}
+
+const handleFileSelect = (e) => {
+  const files = e.target.files
+  if (files && files.length > 0) {
+    processFile(files[0])
+  }
+}
+
+const processFile = (file) => {
+  if (!file.type.startsWith('image/')) {
+    alert('Please select an image file')
+    return
+  }
+  uploadedFile.value = file
+  uploadedFileUrl.value = URL.createObjectURL(file)
+}
+
+const clearUpload = () => {
+  if (uploadedFileUrl.value) {
+    URL.revokeObjectURL(uploadedFileUrl.value)
+  }
+  uploadedFile.value = null
+  uploadedFileUrl.value = null
+  if (fileInput.value) fileInput.value.value = ''
+}
+
+const clearSearch = () => {
+  searchArtist.value = ''
+  searchAlbum.value = ''
+  searched.value = false
+  candidates.value = []
 }
 
 const toggleProvider = (provider) => {
@@ -265,24 +470,38 @@ const isProviderSelected = (provider) => {
   return selectedProviders.value.includes(provider)
 }
 
-// Watch props to log changes
-watch(() => props.initialArtist, (val) => {
-  console.log('[MetadataSearchModal] initialArtist changed to:', val)
-}, { immediate: true })
-
-watch(() => props.initialAlbum, (val) => {
-  console.log('[MetadataSearchModal] initialAlbum changed to:', val)
-}, { immediate: true })
-
-// Initialize with props - clear user edits when modal opens
+// Initialize with props
 watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
-    console.log('[MetadataSearchModal] Opening with artist:', props.initialArtist, 'album:', props.initialAlbum)
-    // Clear any previous user edits
     searchArtist.value = ''
     searchAlbum.value = ''
     searched.value = false
     clearSelection()
+    clearUpload()
+    manualCoverUrl.value = ''
   }
 })
 </script>
+
+<style scoped>
+.metadata-modal :deep(.relative) {
+  scroll-behavior: smooth;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+</style>

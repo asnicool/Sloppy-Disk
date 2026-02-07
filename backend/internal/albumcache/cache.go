@@ -29,9 +29,18 @@ type AlbumCache struct {
 	pageCache      map[string]cachedPage
 	pageCacheMutex sync.RWMutex
 
+	// Album Details Cache (tracklists + summary)
+	detailsCache      map[string]cachedDetails
+	detailsCacheMutex sync.RWMutex
+
 	// Inflight enrichment tracking
 	inflight      map[string]bool
 	inflightMutex sync.Mutex
+}
+
+type cachedDetails struct {
+	Data      interface{}
+	ExpiresAt time.Time
 }
 
 type cachedPage struct {
@@ -61,9 +70,10 @@ var (
 func GetCache() *AlbumCache {
 	once.Do(func() {
 		defaultCache = &AlbumCache{
-			albums:    []models.Album{},
-			pageCache: make(map[string]cachedPage),
-			inflight:  make(map[string]bool),
+			albums:       []models.Album{},
+			pageCache:    make(map[string]cachedPage),
+			detailsCache: make(map[string]cachedDetails),
+			inflight:     make(map[string]bool),
 		}
 	})
 	return defaultCache
@@ -447,7 +457,7 @@ func (ac *AlbumCache) SearchAlbums(query string, offset, limit int) ([]models.Al
 func (ac *AlbumCache) GetAllAlbums() []models.Album {
 	ac.mu.RLock()
 	defer ac.mu.RUnlock()
-	
+
 	// Return a copy to prevent external modification
 	result := make([]models.Album, len(ac.albums))
 	copy(result, ac.albums)
@@ -459,26 +469,26 @@ func (ac *AlbumCache) GetAllAlbums() []models.Album {
 func (ac *AlbumCache) SearchAlbumsByFields(query string) []models.Album {
 	ac.mu.RLock()
 	defer ac.mu.RUnlock()
-	
+
 	if len(ac.albums) == 0 {
 		return []models.Album{}
 	}
-	
+
 	query = strings.ToLower(strings.TrimSpace(query))
 	if query == "" {
 		return ac.albums
 	}
-	
+
 	var results []models.Album
 	for _, album := range ac.albums {
 		if strings.Contains(strings.ToLower(album.Album), query) ||
-		   strings.Contains(strings.ToLower(album.Artist), query) ||
-		   strings.Contains(strings.ToLower(album.Genre), query) ||
-		   strings.Contains(strings.ToLower(album.Date), query) {
+			strings.Contains(strings.ToLower(album.Artist), query) ||
+			strings.Contains(strings.ToLower(album.Genre), query) ||
+			strings.Contains(strings.ToLower(album.Date), query) {
 			results = append(results, album)
 		}
 	}
-	
+
 	return results
 }
 
@@ -553,4 +563,34 @@ func (ac *AlbumCache) BackgroundEnrichAndCache(offset, limit int, sortMode strin
 	// cache
 	ac.SetCachedPage(key, enriched)
 	log.Printf("Background enriched and cached page: %s (%d items)", key, len(enriched))
+}
+
+// GetAlbumDetails returns cached album details if they exist and haven't expired
+func (ac *AlbumCache) GetAlbumDetails(artist, album string) (interface{}, bool) {
+	key := fmt.Sprintf("%s|%s", artist, album)
+	ac.detailsCacheMutex.RLock()
+	defer ac.detailsCacheMutex.RUnlock()
+
+	item, ok := ac.detailsCache[key]
+	if !ok {
+		return nil, false
+	}
+
+	if time.Now().After(item.ExpiresAt) {
+		return nil, false
+	}
+
+	return item.Data, true
+}
+
+// SetAlbumDetails stores album details in the cache
+func (ac *AlbumCache) SetAlbumDetails(artist, album string, data interface{}) {
+	key := fmt.Sprintf("%s|%s", artist, album)
+	ac.detailsCacheMutex.Lock()
+	defer ac.detailsCacheMutex.Unlock()
+
+	ac.detailsCache[key] = cachedDetails{
+		Data:      data,
+		ExpiresAt: time.Now().Add(10 * time.Minute),
+	}
 }

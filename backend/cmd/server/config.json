@@ -3,8 +3,14 @@
   "mpdPort": 6600,
   "musicRoot": "",
   "coverArtRoot": "",
+  "coverArtBaseUrl": "",
   "rsyncRemoteTarget": "",
   "rsyncOptions": "",
   "randomAlbumCount": 0,
-  "enableActivityRefresh": false
+  "enableActivityRefresh": false,
+  "musicBrainzEnabled": false,
+  "discogsEnabled": false,
+  "freeDbEnabled": false,
+  "gnuDbEnabled": false,
+  "albumArtEnabled": false
 }

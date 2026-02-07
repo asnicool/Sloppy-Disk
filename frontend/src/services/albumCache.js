@@ -143,6 +143,58 @@ class AlbumCache {
   }
 
   /**
+   * Set overlay data for an album
+   * @param {string} artist 
+   * @param {string} album 
+   * @param {Object} data - Overlay metadata
+   */
+  setOverlay(artist, album, data) {
+    const key = this.generateKey(artist, album)
+    const entry = this.cache.get(key) || { data: {}, timestamp: Date.now(), lastAccess: Date.now() }
+    
+    entry.overlay = data
+    entry.overlayTimestamp = Date.now()
+    
+    this.cache.set(key, entry)
+  }
+
+  /**
+   * Get overlay data for an album
+   * @param {string} artist 
+   * @param {string} album 
+   * @returns {Object|null}
+   */
+  getOverlay(artist, album) {
+    const key = this.generateKey(artist, album)
+    const entry = this.cache.get(key)
+    
+    if (!entry || !entry.overlay) return null
+    
+    // Check if overlay is too old (24 hours)
+    if (Date.now() - entry.overlayTimestamp > 24 * 60 * 60 * 1000) {
+      delete entry.overlay
+      delete entry.overlayTimestamp
+      return null
+    }
+    
+    return entry.overlay
+  }
+
+  /**
+   * Clear overlay for an album
+   * @param {string} artist 
+   * @param {string} album 
+   */
+  clearOverlay(artist, album) {
+    const key = this.generateKey(artist, album)
+    const entry = this.cache.get(key)
+    if (entry) {
+      delete entry.overlay
+      delete entry.overlayTimestamp
+    }
+  }
+
+  /**
    * Clear all cached data
    */
   clear() {

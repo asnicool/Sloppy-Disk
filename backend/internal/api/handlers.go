@@ -58,6 +58,7 @@ func RegisterRoutes(r *mux.Router) {
 	api.HandleFunc("/albums", HandleAlbumList).Methods("GET")
 	api.HandleFunc("/albums/all", HandleAllAlbums).Methods("GET")
 	api.HandleFunc("/albums/random", HandleRandomAlbums).Methods("GET")
+	api.HandleFunc("/albums/details/batch", HandleAlbumDetailsBatch).Methods("POST")
 	api.HandleFunc("/albums/search", HandleAlbumSearch).Methods("GET")
 	api.HandleFunc("/albums/enrich", HandleAlbumEnrich).Methods("POST")
 	api.HandleFunc("/playlist/album", HandlePlaylistAlbum).Methods("POST")
@@ -79,6 +80,7 @@ func RegisterRoutes(r *mux.Router) {
 	// Cover Art - specific routes first, then catch-all
 	api.HandleFunc("/coverart/candidates", GetCoverArtCandidates).Methods("GET")
 	api.HandleFunc("/coverart/apply", ApplyCoverArt).Methods("POST")
+	api.HandleFunc("/coverart/upload", UploadCoverArt).Methods("POST")
 	api.HandleFunc("/coverart/{path:.*}", GetCoverArt).Methods("GET")
 
 	// WebSockets
@@ -538,9 +540,12 @@ func ApplyMetadata(w http.ResponseWriter, r *http.Request) {
 
 	// Apply cover art if provided
 	if req.CoverArtURL != "" {
-		if err := tagWriter.ApplyCoverArt(req.AlbumPath, req.CoverArtURL); err != nil {
+		coverResult, err := tagWriter.ApplyCoverArt(req.AlbumPath, req.CoverArtURL)
+		if err != nil {
 			// Log but don't fail
 			result.Errors = append(result.Errors, "Cover art: "+err.Error())
+		} else {
+			log.Printf("Cover art applied: %s (format: %s, size: %d bytes)", coverResult.DestPath, coverResult.Format, coverResult.ContentLength)
 		}
 	}
 
@@ -551,11 +556,9 @@ func GetCoverArtCandidates(w http.ResponseWriter, r *http.Request) {
 	artist := r.URL.Query().Get("artist")
 	album := r.URL.Query().Get("album")
 
-	// Use metadata aggregator for cover art search
-	aggregator := metadata.NewAggregator()
-	candidates, err := aggregator.SearchCoverArt(r.Context(), artist, album)
+	manager := coverart.NewManager()
+	candidates, err := manager.FetchCandidates(artist, album)
 	if err != nil {
-		// Fallback to placeholder if aggregator fails
 		SendJSON(w, models.APIResponse{Success: true, Data: []models.CoverArtCandidate{}})
 		return
 	}
@@ -577,6 +580,35 @@ func ApplyCoverArt(w http.ResponseWriter, r *http.Request) {
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	SendJSON(w, models.APIResponse{Success: true})
+}
+
+func UploadCoverArt(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10MB max
+		SendError(w, http.StatusBadRequest, "Failed to parse form: "+err.Error())
+		return
+	}
+
+	albumPath := r.FormValue("albumPath")
+	if albumPath == "" {
+		SendError(w, http.StatusBadRequest, "albumPath is required")
+		return
+	}
+
+	file, header, err := r.FormFile("cover")
+	if err != nil {
+		SendError(w, http.StatusBadRequest, "cover file is required")
+		return
+	}
+	defer file.Close()
+
+	contentType := header.Header.Get("Content-Type")
+	manager := coverart.NewManager()
+	if err := manager.SaveUploadedCover(albumPath, file, contentType); err != nil {
+		SendError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	SendJSON(w, models.APIResponse{Success: true})
 }
 
@@ -700,9 +732,15 @@ func Previous(w http.ResponseWriter, r *http.Request) {
 
 func SetVolume(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	volume, _ := url.PathUnescape(vars["volume"])
+	volumeStr, _ := url.PathUnescape(vars["volume"])
+	volume := parseInt(volumeStr)
 
-	_, err := mpd.GetClient().SendCommand(fmt.Sprintf("setvol %s", volume))
+	if volume < 0 || volume > 100 {
+		SendError(w, http.StatusBadRequest, "Volume must be between 0 and 100")
+		return
+	}
+
+	_, err := mpd.GetClient().SendCommand(fmt.Sprintf("setvol %d", volume))
 	if err != nil {
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -779,6 +817,9 @@ func SendJSON(w http.ResponseWriter, data interface{}) {
 }
 
 func SendError(w http.ResponseWriter, code int, message string) {
+	if strings.Contains(strings.ToLower(message), "server busy") {
+		code = http.StatusTooManyRequests
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(models.APIResponse{Success: false, Error: message})

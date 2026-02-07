@@ -300,59 +300,62 @@ export const useMpdStore = defineStore('mpd', () => {
       })
 
       // Check cache first (unless forceRefresh)
+      let cached = null
       if (!forceRefresh) {
-        const cached = albumCache.get(artist, album)
+        cached = albumCache.get(artist, album)
         if (cached && !cached.isStale) {
           console.log('[MPD Store] Cache hit (fresh):', artist, '-', album)
-          return cached.data
-        }
-        
-        if (cached && cached.isStale) {
-          console.log('[MPD Store] Cache hit (stale):', artist, '-', album, '- fetching fresh in background')
-          // Return stale data immediately, then fetch fresh in background
-          // Schedule background refresh without awaiting
-          setTimeout(async () => {
-            try {
-              const response = await axios.get(`${API_BASE}/album/${encodeURIComponent(artist)}/${encodeURIComponent(album)}?${params}`)
-              if (response.data.success) {
-                // Check if data has changed
-                const cachedData = albumCache.get(artist, album)
-                if (cachedData && JSON.stringify(cachedData.data) !== JSON.stringify(response.data.data)) {
-                  albumCache.set(artist, album, response.data.data)
-                  // Emit event for UI refresh if needed
-                  window.dispatchEvent(new CustomEvent('album-cache-updated', { 
-                    detail: { artist, album, data: response.data.data } 
-                  }))
-                }
-              }
-            } catch (error) {
-              console.error('[MPD Store] Background refresh failed:', error)
-            }
-          }, 0)
-          
-          // Return cached stale data immediately for responsiveness
+          // Merge overlay if present
+          const overlay = albumCache.getOverlay(artist, album)
+          if (overlay) {
+            console.log('[MPD Store] Applying overlay to cached data')
+            return { ...cached.data, ...overlay, isOverlayActive: true }
+          }
           return cached.data
         }
       }
 
-      // Cache miss or force refresh - fetch from API
-      console.log('[MPD Store] Cache miss or force refresh:', artist, '-', album)
+      // Cache miss or force refresh or stale - fetch from API
+      console.log('[MPD Store] Fetching from API:', artist, '-', album)
       const response = await axios.get(`${API_BASE}/album/${encodeURIComponent(artist)}/${encodeURIComponent(album)}?${params}`)
-      console.log('[MPD Store] API response status:', response.status, response.data)
       
       if (response.data.success) {
-        // Cache the response
-        albumCache.set(artist, album, response.data.data)
-        console.log('[MPD Store] Cached data:', response.data.data)
-        return response.data.data
+        const serverData = response.data.data
+        const overlay = albumCache.getOverlay(artist, album)
+        
+        if (overlay) {
+          // Check if server data is now up to date with overlay
+          if (isDataSynced(serverData, overlay)) {
+            console.log('[MPD Store] Server caught up with overlay, clearing overlay')
+            albumCache.clearOverlay(artist, album)
+            albumCache.set(artist, album, serverData)
+            return serverData
+          } else {
+            console.log('[MPD Store] Server still out of sync with overlay, using overlay')
+            albumCache.set(artist, album, serverData)
+            return { ...serverData, ...overlay, isOverlayActive: true }
+          }
+        }
+
+        albumCache.set(artist, album, serverData)
+        return serverData
       }
       
-      console.error('[MPD Store] API returned success=false:', response.data)
       return response.data
     } catch (error) {
       console.error('Fetch album songs failed:', error)
       throw error
     }
+  }
+
+  const isDataSynced = (serverData, overlay) => {
+    // Basic comparison logic for sync detection
+    if (overlay.album && serverData.album !== overlay.album) return false
+    if (overlay.artist && serverData.artist !== overlay.artist) return false
+    if (overlay.year && serverData.year !== overlay.year) return false
+    if (overlay.genre && serverData.genre !== overlay.genre) return false
+    // Track matching could be more complex, skipping for brevity
+    return true
   }
 
   const search = async (query, type = 'song', page = 1, limit = 30) => {
@@ -668,6 +671,23 @@ export const useMpdStore = defineStore('mpd', () => {
     }
   }
 
+  const uploadCoverArt = async (albumPath, file) => {
+    try {
+      const formData = new FormData()
+      formData.append('albumPath', albumPath)
+      formData.append('cover', file)
+      const response = await axios.post(`${API_BASE}/coverart/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+      return response.data
+    } catch (error) {
+      console.error('Upload cover art failed:', error)
+      throw error
+    }
+  }
+
    // Metadata search functions
    const fetchMetadataCandidates = async (artist, album, providers = []) => {
      try {
@@ -707,6 +727,18 @@ export const useMpdStore = defineStore('mpd', () => {
          metadata: metadata,
          coverArtUrl: coverArtUrl
        })
+       if (response.data.success) {
+         // Create overlay from metadata
+         const overlay = {
+           album: metadata.album,
+           artist: metadata.artist,
+           year: metadata.year,
+           genre: metadata.genre,
+           tracks: metadata.tracks,
+           originalMetadata: metadata // Store full candidate for reapply
+         }
+         albumCache.setOverlay(metadata.artist, metadata.album, overlay)
+       }
        return response.data
      } catch (error) {
        console.error('Apply metadata failed:', error)

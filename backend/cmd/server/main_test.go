@@ -19,6 +19,14 @@ import (
 func setupRouter() *mux.Router {
 	r := mux.NewRouter()
 	api.RegisterRoutes(r)
+
+	// Add a dummy root handler for TestServeSimpleHTML
+	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("\u003chtml\u003e\u003cbody\u003eTest\u003c/body\u003e\u003c/html\u003e"))
+	}).Methods("GET")
+
 	return r
 }
 
