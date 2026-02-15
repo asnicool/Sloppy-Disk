@@ -1,105 +1,239 @@
 <template>
   <div class="space-y-6">
     <div class="flex justify-between items-center">
-      <h1 class="text-3xl font-bold text-white">Genres</h1>
+      <h1 class="text-3xl font-bold text-white">Genres & Dates Matrix</h1>
+      <div class="text-neutral-400 text-sm">
+        Click any cell to view matching albums
+        <span v-if="isLoadingAlbums" class="ml-2 text-blue-400">(Loading...)</span>
+      </div>
     </div>
 
     <div v-if="loading" class="flex justify-center items-center py-20">
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
     </div>
 
-    <div v-else class="space-y-8">
-      <div v-for="group in groups" :key="group.key" class="space-y-4">
-        <h2 class="text-2xl font-semibold text-primary-400 border-b border-neutral-800 pb-2 cursor-pointer hover:text-primary-300 transition-colors"
-            @click="navigateToGenre(group.key)"
-            :title="'Click to view all albums in ' + (group.key || 'Unknown Genre')"
-        >
-          {{ group.key || 'Unknown Genre' }}
-        </h2>
-        
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          <div 
-            v-for="album in group.albums" 
-            :key="album"
-            @click="navigateToAlbum(album)"
-            class="group bg-neutral-900/50 rounded-lg p-3 hover:bg-neutral-800 transition-all cursor-pointer border border-neutral-800 hover:border-primary-500/50"
-          >
-            <div class="aspect-square bg-neutral-800 rounded-md mb-2 flex items-center justify-center overflow-hidden">
-               <svg class="w-12 h-12 text-neutral-700" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8H5v2h2V8zm2 0h2v2H9V8zm6 0h-2v2h2V8z" />
-              </svg>
-            </div>
-            <p class="text-sm font-medium text-neutral-200 truncate group-hover:text-primary-400">{{ album }}</p>
-          </div>
-        </div>
+    <div v-else-if="error" class="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-200">
+      {{ error }}
+    </div>
+
+    <div v-else class="bg-neutral-800 rounded-lg border border-neutral-700 overflow-hidden">
+      <!-- Matrix Container with scroll -->
+      <div class="matrix-container">
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th class="sticky-header sticky-col bg-neutral-900">Genre / Year</th>
+              <th 
+                v-for="date in matrixData.dates" 
+                :key="date"
+                class="sticky-header bg-neutral-900 text-neutral-400 font-medium"
+              >
+                {{ date }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="genre in matrixData.genres" :key="genre">
+              <td class="sticky-col bg-neutral-800 text-neutral-300 font-medium">
+                {{ genre || 'Unknown' }}
+              </td>
+              <td 
+                v-for="date in matrixData.dates" 
+                :key="`${genre}-${date}`"
+                class="matrix-cell"
+                :class="{ 
+                  'has-albums': getCount(genre, date) > 0,
+                  'empty': !getCount(genre, date)
+                }"
+                @click="handleCellClick(genre, date)"
+              >
+                <span v-if="getCount(genre, date) > 0" class="count">
+                  {{ getCount(genre, date) }}
+                </span>
+                <span v-else class="empty-indicator">-</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
-    <!-- Pagination -->
-    <div v-if="!loading && totalPages > 1" class="flex justify-center items-center space-x-4 pt-8">
-      <button
-        @click="changePage(currentPage - 1)"
-        :disabled="currentPage === 1"
-        class="px-4 py-2 bg-neutral-800 text-neutral-300 rounded-md hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        Previous
-      </button>
-      <span class="text-neutral-400">Page {{ currentPage }} of {{ totalPages }}</span>
-      <button
-        @click="changePage(currentPage + 1)"
-        :disabled="currentPage === totalPages"
-        class="px-4 py-2 bg-neutral-800 text-neutral-300 rounded-md hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        Next
-      </button>
+    <!-- Legend -->
+    <div class="flex items-center gap-6 text-sm text-neutral-400">
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 bg-blue-600/30 rounded"></div>
+        <span>Has albums (click to view)</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 bg-neutral-800 rounded"></div>
+        <span>No albums</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useMpdStore } from '@/stores/mpd'
+import { useMpdStore } from '@/stores/mpdStore'
 
 const router = useRouter()
 const mpdStore = useMpdStore()
 
-const groups = ref([])
 const loading = ref(true)
-const currentPage = ref(1)
-const totalPages = ref(1)
-const limit = 20
+const error = ref(null)
 
-const fetchGroups = async () => {
-  loading.value = true
-  try {
-    const res = await mpdStore.fetchAlbumsByGenre(currentPage.value, limit)
-    if (res.success) {
-      groups.value = res.data
-      totalPages.value = Math.ceil((res.meta?.total || 1) / limit)
-    }
-  } catch (err) {
-    console.error('Failed to fetch genres:', err)
-  } finally {
+// Use computed matrix from store (Phase 1)
+const matrixData = computed(() => mpdStore.genreDateMatrix)
+const isLoadingAlbums = computed(() => mpdStore.isLoadingAlbums)
+
+const getCount = (genre, date) => {
+  return matrixData.value.matrix[genre]?.[date] || 0
+}
+
+const handleCellClick = (genre, date) => {
+  const count = getCount(genre, date)
+  if (count > 0) {
+    // Navigate to search with genre and date filters
+    router.push({ 
+      name: 'search', 
+      query: { 
+        genre: genre,
+        date: date
+      } 
+    })
+  }
+}
+
+// Wait for albums to load if not already loaded
+onMounted(() => {
+  // If albums are already loaded, we're ready
+  if (mpdStore.allAlbums.length > 0) {
     loading.value = false
+    return
   }
-}
-
-const changePage = (newPage) => {
-  if (newPage >= 1 && newPage <= totalPages.value) {
-    currentPage.value = newPage
-    fetchGroups()
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-}
-
-const navigateToAlbum = (albumName) => {
-  router.push({ name: 'search', query: { q: albumName } })
-}
-
-const navigateToGenre = (genre) => {
-  router.push({ name: 'search', query: { q: genre, type: 'genre' } })
-}
-
-onMounted(fetchGroups)
+  
+  // Otherwise, wait for them to load
+  const checkInterval = setInterval(() => {
+    if (!mpdStore.isLoadingAlbums && mpdStore.allAlbums.length > 0) {
+      loading.value = false
+      clearInterval(checkInterval)
+    } else if (!mpdStore.isLoadingAlbums && mpdStore.allAlbums.length === 0) {
+      // Try loading albums
+      mpdStore.loadAllAlbums()
+    }
+  }, 100)
+  
+  // Timeout after 30 seconds
+  setTimeout(() => {
+    clearInterval(checkInterval)
+    if (loading.value) {
+      loading.value = false
+      error.value = 'Failed to load album data. Please refresh the page.'
+    }
+  }, 30000)
+})
 </script>
+
+<style scoped>
+.matrix-container {
+  max-height: 70vh;
+  overflow: auto;
+  position: relative;
+}
+
+.matrix-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: auto;
+  min-width: 100%;
+}
+
+/* Sticky headers */
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 12px 16px;
+  text-align: center;
+  font-size: 0.875rem;
+  border-bottom: 1px solid #374151;
+  white-space: nowrap;
+}
+
+.sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 0.875rem;
+  border-right: 1px solid #374151;
+  white-space: nowrap;
+  min-width: 150px;
+}
+
+/* Corner cell (first th) needs higher z-index */
+.sticky-header.sticky-col {
+  z-index: 30;
+}
+
+/* Table cells */
+.matrix-cell {
+  padding: 12px 16px;
+  text-align: center;
+  font-size: 0.875rem;
+  border-bottom: 1px solid #374151;
+  border-right: 1px solid #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 70px;
+}
+
+.matrix-cell.has-albums {
+  background-color: rgba(37, 99, 235, 0.2);
+  color: #60a5fa;
+}
+
+.matrix-cell.has-albums:hover {
+  background-color: rgba(37, 99, 235, 0.4);
+}
+
+.matrix-cell.empty {
+  background-color: #1f2937;
+  color: #4b5563;
+  cursor: default;
+}
+
+.matrix-cell .count {
+  font-weight: 600;
+}
+
+.matrix-cell .empty-indicator {
+  opacity: 0.3;
+}
+
+/* Body rows */
+tbody tr:hover .sticky-col {
+  background-color: #262626;
+}
+
+/* Scrollbar styling */
+.matrix-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.matrix-container::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+.matrix-container::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+
+.matrix-container::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+</style>

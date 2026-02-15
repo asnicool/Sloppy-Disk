@@ -36,6 +36,10 @@ type AlbumCache struct {
 	// Inflight enrichment tracking
 	inflight      map[string]bool
 	inflightMutex sync.Mutex
+
+	// Prevent concurrent refreshes
+	refreshMutex sync.Mutex
+	refreshing  bool
 }
 
 type cachedDetails struct {
@@ -81,6 +85,23 @@ func GetCache() *AlbumCache {
 
 // Refresh rebuilds the album cache from MPD
 func (ac *AlbumCache) Refresh() error {
+	// Prevent concurrent refreshes
+	ac.refreshMutex.Lock()
+	if ac.refreshing {
+		ac.refreshMutex.Unlock()
+		log.Println("Album cache refresh already in progress, skipping...")
+		return nil
+	}
+	ac.refreshing = true
+	ac.refreshMutex.Unlock()
+
+	// Ensure we clear the refreshing flag even if there's an error
+	defer func() {
+		ac.refreshMutex.Lock()
+		ac.refreshing = false
+		ac.refreshMutex.Unlock()
+	}()
+
 	client := mpd.GetClient()
 	if err := client.Execute(func(conn *mpd.Connection) error {
 		return conn.EnsureConnection()
@@ -91,7 +112,6 @@ func (ac *AlbumCache) Refresh() error {
 	log.Println("Starting album cache refresh...")
 	start := time.Now()
 
-	// 1. Get all album keys
 	// 1. Get all album keys
 	// We fetch all at once since MPD 'list' command windowing can be problematic
 	allKeys, err := client.GetAllAlbumKeys()
@@ -144,6 +164,8 @@ func (ac *AlbumCache) Refresh() error {
 }
 
 // EnrichAlbums takes a slice of albums and fetches their missing metadata from MPD
+// NOTE: This function NO LONGER calls GetAlbumStats() to avoid overwhelming MPD
+// Stats (TrackCount, Duration) will remain 0 and should be loaded opportunistically
 func (ac *AlbumCache) EnrichAlbums(albums []models.Album) ([]models.Album, error) {
 	if len(albums) == 0 {
 		return albums, nil
@@ -151,71 +173,99 @@ func (ac *AlbumCache) EnrichAlbums(albums []models.Album) ([]models.Album, error
 
 	client := mpd.GetClient()
 
-	var batchKeys []models.AlbumKey
-	for _, a := range albums {
-		batchKeys = append(batchKeys, models.AlbumKey{
-			Album:       a.Album,
-			AlbumArtist: a.Artist,
-		})
-	}
-
-	statsMap, err := client.GetAlbumStats(batchKeys)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get stats: %w", err)
-	}
-
-	reps, err := client.GetAlbumRepresentatives(batchKeys)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get reps: %w", err)
-	}
+	// Process in smaller batches to avoid overwhelming MPD
+	// Max batch size of 3 albums for opportunistic enrichment
+	const maxEnrichBatchSize = 3
 
 	enriched := make([]models.Album, len(albums))
-	for i, a := range albums {
-		key := models.AlbumKey{Album: a.Album, AlbumArtist: a.Artist}
-		stats := statsMap[key]
-		rep := reps[key]
 
-		enriched[i] = a
-		if stats != (models.AlbumStats{}) {
-			enriched[i].TrackCount = stats.TrackCount
-			enriched[i].Duration = stats.TotalDuration
+	// Process albums in batches
+	for i := 0; i < len(albums); i += maxEnrichBatchSize {
+		end := i + maxEnrichBatchSize
+		if end > len(albums) {
+			end = len(albums)
 		}
-		if rep != nil {
-			enriched[i].Date = rep.Date
-			enriched[i].Path = rep.Path
-			if enriched[i].Artist == "" {
-				enriched[i].Artist = rep.Artist
+		batch := albums[i:end]
+
+		// Create batch keys for this batch
+		var batchKeys []models.AlbumKey
+		for _, a := range batch {
+			batchKeys = append(batchKeys, models.AlbumKey{
+				Album:       a.Album,
+				AlbumArtist: a.Artist,
+			})
+		}
+
+		log.Printf("[AlbumCache] Enriching batch %d-%d (%d albums)", i, end, len(batch))
+
+		// REMOVED: GetAlbumStats - no longer called to avoid MPD overload
+		// TrackCount and Duration will remain 0 until opportunistically loaded
+
+		reps, err := client.GetAlbumRepresentatives(batchKeys)
+		if err != nil {
+			log.Printf("[AlbumCache] Failed to get reps for batch %d-%d: %v", i, end, err)
+			// Continue with partially enriched data
+			for j, a := range batch {
+				enriched[i+j] = a
 			}
-			// Fallback for empty album name: use parent directory
-			if enriched[i].Album == "" && rep.Path != "" {
-				dir := filepath.Base(filepath.Dir(rep.Path))
-				if dir != "." && dir != "/" {
-					enriched[i].Album = dir
-				} else {
-					enriched[i].Album = "Unknown Album"
+			continue
+		}
+
+		// Apply enrichment to this batch (only representative data)
+		for j, a := range batch {
+			key := models.AlbumKey{Album: a.Album, AlbumArtist: a.Artist}
+			rep := reps[key]
+
+			enriched[i+j] = a
+			// NOTE: TrackCount and Duration are NOT set (remain 0)
+			// These will be loaded opportunistically when album details are viewed
+
+			if rep != nil {
+				// Only overwrite Date and Genre if representative has non-empty values
+				// This preserves values from GetAllAlbumKeys() which may be more accurate
+				if rep.Date != "" {
+					enriched[i+j].Date = rep.Date
+				}
+				if rep.Genre != "" {
+					enriched[i+j].Genre = rep.Genre
+				}
+				enriched[i+j].Path = rep.Path
+				if enriched[i+j].Artist == "" {
+					enriched[i+j].Artist = rep.Artist
+				}
+				// Fallback for empty album name: use parent directory
+				if enriched[i+j].Album == "" && rep.Path != "" {
+					dir := filepath.Base(filepath.Dir(rep.Path))
+					if dir != "." && dir != "/" {
+						enriched[i+j].Album = dir
+					} else {
+						enriched[i+j].Album = "Unknown Album"
+					}
+				}
+
+				// Populate CoverURL
+				if enriched[i+j].Path != "" {
+					albumPath := filepath.Dir(enriched[i+j].Path)
+					if albumPath == "." {
+						albumPath = ""
+					}
+					// Escape path for URL, keeping slashes
+					pathParts := strings.Split(albumPath, "/")
+					for idx, part := range pathParts {
+						pathParts[idx] = url.PathEscape(part)
+					}
+					escapedPath := strings.Join(pathParts, "/")
+					enriched[i+j].CoverURL = fmt.Sprintf("/api/coverart/%s", escapedPath)
 				}
 			}
 
-			// Populate CoverURL
-			if enriched[i].Path != "" {
-				albumPath := filepath.Dir(enriched[i].Path)
-				if albumPath == "." {
-					albumPath = ""
-				}
-				// Escape path for URL, keeping slashes
-				pathParts := strings.Split(albumPath, "/")
-				for idx, part := range pathParts {
-					pathParts[idx] = url.PathEscape(part)
-				}
-				escapedPath := strings.Join(pathParts, "/")
-				enriched[i].CoverURL = fmt.Sprintf("/api/coverart/%s", escapedPath)
+			// Ensure every album has an ID
+			if enriched[i+j].ID == "" {
+				enriched[i+j].ID = fmt.Sprintf("%x", fmt.Sprintf("%s|%s", enriched[i+j].Artist, enriched[i+j].Album))
 			}
 		}
 
-		// Ensure every album has an ID
-		if enriched[i].ID == "" {
-			enriched[i].ID = fmt.Sprintf("%x", fmt.Sprintf("%s|%s", enriched[i].Artist, enriched[i].Album))
-		}
+		log.Printf("[AlbumCache] Completed batch %d-%d", i, end)
 	}
 
 	return enriched, nil
@@ -375,8 +425,9 @@ func (ac *AlbumCache) MaintainRandomBuffer() {
 			return
 		}
 
-		// Yield/Sleep slightly to allow other MPD commands to interleave
-		time.Sleep(50 * time.Millisecond)
+		// Yield/Sleep to allow other MPD commands to interleave
+		// Increased from 50ms to 200ms to reduce MPD load during startup
+		time.Sleep(200 * time.Millisecond)
 	}
 }
 

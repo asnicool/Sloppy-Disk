@@ -76,6 +76,7 @@ func main() {
 
 	// 3. Register Routes
 	api.RegisterRoutes(r)
+	api.RegisterN50Routes(r)
 
 	// Static file serving for music folder (for cover art)
 	// This serves files from the musicRoot directory at /folder path

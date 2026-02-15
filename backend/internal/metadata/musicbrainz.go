@@ -3,7 +3,6 @@ package metadata
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -243,75 +242,79 @@ func (p *MusicBrainzProvider) GetCoverArt(artist, album string) ([]models.CoverA
 		return []models.CoverArtCandidate{}, nil
 	}
 
-	// Need a release ID, search gave ReleaseGroup ID (ExternalID)
-	// We need to resolve to a release ID to get cover art.
+	// Search gave us a ReleaseGroup ID (ExternalID).
+	// We want to find ALL releases in this group that have cover art.
 	rgID := candidates[0].ExternalID
 
-	// Quick lookup to get a release ID
+	// Lookup ReleaseGroup with "releases" inc to get the list of releases
 	rg, err := p.client.LookupReleaseGroup(gomusicbrainz.MBID(rgID), "releases")
-	if err != nil || len(rg.Releases) == 0 {
-		return nil, err
-	}
-
-	coverReleaseID := string(rg.Releases[0].ID)
-
-	// Fetch JSON metadata from Cover Art Archive
-	metadataURL := fmt.Sprintf("%s/release/%s", musicBrainzCoverURL, coverReleaseID)
-	resp, err := http.Get(metadataURL)
 	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		// Fallback to simple /front if JSON not available (might happen for some releases)
-		frontURL := fmt.Sprintf("%s/release/%s/front", musicBrainzCoverURL, coverReleaseID)
-		return []models.CoverArtCandidate{
-			{
-				Source:    "MusicBrainz",
-				URL:       frontURL,
-				Thumbnail: frontURL + "-250",
-				Size:      "full",
-			},
-		}, nil
-	}
-
-	var data struct {
-		Images []struct {
-			Image      string            `json:"image"`
-			Thumbnails map[string]string `json:"thumbnails"`
-			Front      bool              `json:"front"`
-			Types      []string          `json:"types"`
-		} `json:"images"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		return nil, err
 	}
 
 	var results []models.CoverArtCandidate
-	for _, img := range data.Images {
-		if !img.Front {
+	seen := make(map[string]bool)
+
+	// Iterate over ALL releases in the group to find unique cover art
+	for _, release := range rg.Releases {
+		// The library version we use is old and doesn't have CoverArtArchive field on Release struct.
+		// We optimistically add the candidate. The frontend will handle 404s if the image doesn't exist.
+
+		releaseID := string(release.ID)
+
+		// We will try to fetch the "front" image directly from CAA.
+		// We use the direct URL pattern which redirects to the best available image.
+		// https://coverartarchive.org/release/{release-id}/front
+		frontURL := fmt.Sprintf("%s/release/%s/front", musicBrainzCoverURL, releaseID)
+
+		// To avoid duplicates (if multiple releases share the same cover image ID internally,
+		// the URL will still be unique by release ID, but the visual content might be the same.
+		// However, without downloading we can't be sure.
+		// But often different releases have slightly different covers (remaster, different region).
+		// We will treat them as separate candidates for now, as users might prefer one over another.
+
+		// Optimization: Check if we haven't already added this exact URL (unlikely to happen with release ID in URL)
+		if seen[frontURL] {
 			continue
 		}
+		seen[frontURL] = true
 
-		// CAA JSON doesn't always provide dimensions directly in the main Images list,
-		// but we know the 'image' is the original.
-		// Some implementations of CAA API might include dimensions in a 'types' or metadata block,
-		// but usually we just serve the URL.
-		// However, we can at least provide the 1200 thumbnail if it exists as a "high quality" option.
-
-		thumb := img.Thumbnails["small"]
-		if thumb == "" {
-			thumb = img.Thumbnails["250"]
-		}
+		// Create a candidate
+		// We use the "front" endpoint which is a 307 redirect to the actual file.
+		// For the thumbnail, we can append "-250" or "-500" to the *redirected* URL,
+		// but standard CAA behavior for /front/{size} is:
+		// /release/{mbid}/front-250
+		// /release/{mbid}/front-500
+		thumbURL := fmt.Sprintf("%s/release/%s/front-250", musicBrainzCoverURL, releaseID)
 
 		results = append(results, models.CoverArtCandidate{
 			Source:    "MusicBrainz",
-			URL:       img.Image,
-			Thumbnail: thumb,
-			Size:      "full",
+			URL:       frontURL,
+			Thumbnail: thumbURL,
+			Size:      "full", // We don't know the exact dimensions without fetching
 		})
+
+		// Limit the number of candidates to avoid overwhelming the UI
+		if len(results) >= 20 {
+			break
+		}
+	}
+
+	if len(results) == 0 {
+		// Fallback: If no release explicitly flagged "Front", try the first one anyway just in case
+		if len(rg.Releases) > 0 {
+			firstReleaseID := string(rg.Releases[0].ID)
+			frontURL := fmt.Sprintf("%s/release/%s/front", musicBrainzCoverURL, firstReleaseID)
+			return []models.CoverArtCandidate{
+				{
+					Source:    "MusicBrainz",
+					URL:       frontURL,
+					Thumbnail: frontURL + "-250",
+					Size:      "full",
+				},
+			}, nil
+		}
+		return []models.CoverArtCandidate{}, nil
 	}
 
 	return results, nil

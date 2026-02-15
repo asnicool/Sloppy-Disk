@@ -1,156 +1,228 @@
-2026/02/02 19:41:59 Loading configuration from: config.json
+nohup: les entrées sont ignorées
+2026/02/13 22:33:13 Loading configuration from: config.json
 Registering API routes...
-2026/02/02 19:41:59 Serving frontend from: ../frontend/dist
-2026/02/02 19:41:59 Initializing album cache...
+2026/02/13 22:33:13 Serving music files from: /media/music/
+2026/02/13 22:33:13 Serving frontend from: ../frontend/dist
+2026/02/13 22:33:13 Initializing album cache...
 Backend starting on port 7070
-2026/02/02 19:41:59 Starting album cache refresh...
-2026/02/02 19:42:00 Fetched 28386 album keys in 1.447839451s
-2026/02/02 19:42:00 Refreshed cache with 28386 albums in 1.554856796s
-2026/02/02 19:42:02 [MPD] CommandList (10 cmds) took 1.950681176s
-2026/02/02 19:42:04 [MPD] CommandList (10 cmds) took 1.931736647s
-2026/02/02 19:42:04 Random buffer appended 10 items. Size: 10
-2026/02/02 19:42:04 [MPD] CommandList (2 cmds) took 578.905664ms
-2026/02/02 19:42:05 [MPD] CommandList (5 cmds) took 969.333906ms
-2026/02/02 19:42:07 [MPD] CommandList (5 cmds) took 969.323371ms
-2026/02/02 19:42:07 Random buffer appended 5 items. Size: 15
-2026/02/02 19:42:08 [MPD] CommandList (5 cmds) took 965.339284ms
-2026/02/02 19:42:09 [MPD] CommandList (5 cmds) took 968.838198ms
-2026/02/02 19:42:09 Random buffer appended 5 items. Size: 20
-2026/02/02 19:42:10 [MPD] CommandList (5 cmds) took 970.927094ms
-2026/02/02 19:42:11 [MPD] CommandList (5 cmds) took 972.162376ms
-2026/02/02 19:42:11 Random buffer appended 5 items. Size: 25
-2026/02/02 19:42:12 [MPD] CommandList (5 cmds) took 983.250034ms
-2026/02/02 19:42:13 [MPD] CommandList (5 cmds) took 967.25739ms
-2026/02/02 19:42:13 Random buffer appended 5 items. Size: 30
-2026/02/02 19:42:14 [MPD] CommandList (5 cmds) took 965.621077ms
-2026/02/02 19:42:15 [MPD] CommandList (5 cmds) took 967.965977ms
-2026/02/02 19:42:15 Random buffer appended 5 items. Size: 35
-2026/02/02 19:42:16 [MPD] CommandList (5 cmds) took 972.383965ms
-2026/02/02 19:42:18 [MPD] CommandList (5 cmds) took 976.641761ms
-2026/02/02 19:42:18 Random buffer appended 5 items. Size: 40
-2026/02/02 19:42:19 [MPD] CommandList (5 cmds) took 971.769673ms
-2026/02/02 19:42:20 [MPD] CommandList (5 cmds) took 966.978229ms
-2026/02/02 19:42:20 Random buffer appended 5 items. Size: 45
-2026/02/02 19:42:21 [MPD] CommandList (5 cmds) took 968.548845ms
-2026/02/02 19:42:22 [MPD] CommandList (5 cmds) took 975.014375ms
-2026/02/02 19:42:22 Random buffer appended 5 items. Size: 50
-2026/02/02 19:42:23 [MPD] CommandList (5 cmds) took 991.179126ms
-2026/02/02 19:42:24 [MPD] CommandList (5 cmds) took 969.711787ms
-2026/02/02 19:42:24 Random buffer appended 5 items. Size: 55
-2026/02/02 19:42:25 [MPD] CommandList (5 cmds) took 970.878082ms
-2026/02/02 19:42:26 [MPD] CommandList (5 cmds) took 968.980653ms
-2026/02/02 19:42:26 Random buffer appended 5 items. Size: 60
-2026/02/02 19:42:28 [MPD] CommandList (5 cmds) took 1.005690624s
-2026/02/02 19:42:29 [MPD] CommandList (5 cmds) took 967.304663ms
-2026/02/02 19:42:29 Random buffer appended 5 items. Size: 65
-2026/02/02 19:42:30 [MPD] CommandList (5 cmds) took 965.551902ms
-2026/02/02 19:42:31 [MPD] CommandList (5 cmds) took 966.144218ms
-2026/02/02 19:42:31 Random buffer appended 5 items. Size: 70
-2026/02/02 19:42:32 [MPD] CommandList (5 cmds) took 968.835157ms
-2026/02/02 19:42:33 [MPD] CommandList (5 cmds) took 972.286812ms
-2026/02/02 19:42:33 Random buffer appended 5 items. Size: 75
-2026/02/02 19:42:34 [MPD] CommandList (5 cmds) took 969.110171ms
-2026/02/02 19:42:34 [MPD] CommandList (2 cmds) took 154.540846ms
-2026/02/02 19:42:35 [MPD] CommandList (5 cmds) took 969.081392ms
-2026/02/02 19:42:35 Random buffer appended 5 items. Size: 80
-2026/02/02 19:42:36 [METADATA DETAILS] GetMetadataDetails called
-2026/02/02 19:42:36 [METADATA DETAILS]   Source: 'MusicBrainz'
-2026/02/02 19:42:36 [METADATA DETAILS]   ExternalID: '861c35cb-34d2-4547-9b1b-c3207d96c6a0'
-2026/02/02 19:42:36 [METADATA DETAILS] Creating aggregator and fetching details...
-2026/02/02 19:42:36 [MUSICBRAINZ] GetReleaseDetails called with externalID='861c35cb-34d2-4547-9b1b-c3207d96c6a0'
-2026/02/02 19:42:36 [MUSICBRAINZ] Fetching release-group to get release ID: '861c35cb-34d2-4547-9b1b-c3207d96c6a0'
-2026/02/02 19:42:36 [MUSICBRAINZ] Sending request to: https://musicbrainz.org/ws/2/release-group/861c35cb-34d2-4547-9b1b-c3207d96c6a0?fmt=json&inc=releases (attempt 1/3)
-2026/02/02 19:42:36 [MUSICBRAINZ] Retryable error on attempt 1/3: Get "https://musicbrainz.org/ws/2/release-group/861c35cb-34d2-4547-9b1b-c3207d96c6a0?fmt=json&inc=releases": EOF, retrying...
-2026/02/02 19:42:36 [MPD] CommandList (5 cmds) took 969.737911ms
-2026/02/02 19:42:37 [MUSICBRAINZ] Sending request to: https://musicbrainz.org/ws/2/release-group/861c35cb-34d2-4547-9b1b-c3207d96c6a0?fmt=json&inc=releases (attempt 2/3)
-2026/02/02 19:42:37 [MUSICBRAINZ] Retryable error on attempt 2/3: Get "https://musicbrainz.org/ws/2/release-group/861c35cb-34d2-4547-9b1b-c3207d96c6a0?fmt=json&inc=releases": EOF, retrying...
-2026/02/02 19:42:37 [MPD] CommandList (5 cmds) took 972.047916ms
-2026/02/02 19:42:37 Random buffer appended 5 items. Size: 85
-2026/02/02 19:42:39 [MPD] CommandList (5 cmds) took 997.07535ms
-2026/02/02 19:42:39 [MUSICBRAINZ] Sending request to: https://musicbrainz.org/ws/2/release-group/861c35cb-34d2-4547-9b1b-c3207d96c6a0?fmt=json&inc=releases (attempt 3/3)
-2026/02/02 19:42:39 [MUSICBRAINZ] Retryable error on attempt 3/3: Get "https://musicbrainz.org/ws/2/release-group/861c35cb-34d2-4547-9b1b-c3207d96c6a0?fmt=json&inc=releases": EOF, retrying...
-2026/02/02 19:42:39 [MUSICBRAINZ] HTTP request failed: Get "https://musicbrainz.org/ws/2/release-group/861c35cb-34d2-4547-9b1b-c3207d96c6a0?fmt=json&inc=releases": EOF
-2026/02/02 19:42:39 [METADATA DETAILS] Error fetching details: MusicBrainz: Get "https://musicbrainz.org/ws/2/release-group/861c35cb-34d2-4547-9b1b-c3207d96c6a0?fmt=json&inc=releases": EOF
-2026/02/02 19:42:40 [MPD] CommandList (5 cmds) took 968.543001ms
-2026/02/02 19:42:40 Random buffer appended 5 items. Size: 90
-2026/02/02 19:42:41 [MPD] CommandList (5 cmds) took 976.698565ms
-2026/02/02 19:42:42 [MPD] CommandList (5 cmds) took 976.959093ms
-2026/02/02 19:42:42 Random buffer appended 5 items. Size: 95
-2026/02/02 19:42:43 [MPD] CommandList (5 cmds) took 976.189997ms
-2026/02/02 19:42:44 [MPD] CommandList (5 cmds) took 966.431231ms
-2026/02/02 19:42:44 Random buffer appended 5 items. Size: 100
-2026/02/02 19:42:45 [MPD] CommandList (5 cmds) took 966.168884ms
-2026/02/02 19:42:46 [MPD] CommandList (5 cmds) took 966.539172ms
-2026/02/02 19:42:46 Random buffer appended 5 items. Size: 105
-2026/02/02 19:42:47 [MPD] CommandList (5 cmds) took 968.584544ms
-2026/02/02 19:42:48 [MPD] CommandList (5 cmds) took 971.717442ms
-2026/02/02 19:42:48 Random buffer appended 5 items. Size: 110
-2026/02/02 19:42:50 [MPD] CommandList (5 cmds) took 969.328799ms
-2026/02/02 19:42:51 [MPD] CommandList (5 cmds) took 971.254573ms
-2026/02/02 19:42:51 Random buffer appended 5 items. Size: 115
-2026/02/02 19:42:52 [MPD] CommandList (5 cmds) took 975.041675ms
-2026/02/02 19:42:53 [MPD] CommandList (5 cmds) took 974.669043ms
-2026/02/02 19:42:53 Random buffer appended 5 items. Size: 120
-2026/02/02 20:04:13 WebSocket read error: websocket: close 1001 (going away)
-2026/02/02 20:04:14 [MUSICBRAINZ] Search called with artist='Ultravox', album='Lament'
-2026/02/02 20:04:14 [MUSICBRAINZ] Query URL params: query='artist:"Ultravox" AND release:"Lament"', type='album', limit='20'
-2026/02/02 20:04:14 [MUSICBRAINZ] Sending request to: https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album (attempt 1/3)
-2026/02/02 20:04:14 [MUSICBRAINZ] Request succeeded on attempt 1/3
-2026/02/02 20:04:14 [MUSICBRAINZ] Response status: 200 200 OK
-2026/02/02 20:04:14 [MUSICBRAINZ] Parsing JSON response...
-2026/02/02 20:04:14 [MUSICBRAINZ] API returned 2 release groups (count=2)
-2026/02/02 20:04:14 [MUSICBRAINZ] Release group 0: Title='Lament', Date='1984-06-21', ID='861c35cb-34d2-4547-9b1b-c3207d96c6a0'
-2026/02/02 20:04:14 [MUSICBRAINZ]   Releases: 2 available
-2026/02/02 20:04:14 [MUSICBRAINZ] Creating candidate: Artist='Ultravox', Album='Lament', Year='1984', ReleaseID='531cc57a-88c1-4b68-a2eb-5a843dcf7f9a'
-2026/02/02 20:04:14 [MUSICBRAINZ] Release group 1: Title='Lament', Date='1984-05', ID='56271b4c-ca60-3500-9a6e-56f92bf6fa24'
-2026/02/02 20:04:14 [MUSICBRAINZ]   Releases: 16 available
-2026/02/02 20:04:14 [MUSICBRAINZ] Creating candidate: Artist='Ultravox', Album='Lament', Year='1984', ReleaseID='312f9e5f-4dd2-4698-b71a-9cd725edf413'
-2026/02/02 20:04:14 [MUSICBRAINZ] Returning 2 candidates
-2026/02/02 20:04:14 [MPD] CommandList (2 cmds) took 163.39761ms
-2026/02/02 20:04:14 [MPD] Command 'find album "Lament" artist "Ultravox"' took 261.851272ms
-2026/02/02 20:04:18 [METADATA HANDLER] SearchMetadata called
-2026/02/02 20:04:18 [METADATA HANDLER]   Artist: 'Ultravox'
-2026/02/02 20:04:18 [METADATA HANDLER]   Album: 'Lament'
-2026/02/02 20:04:18 [METADATA HANDLER]   Providers param: 'MusicBrainz,Discogs,FreeDB'
-2026/02/02 20:04:18 [METADATA HANDLER]   Parsed providers: [MusicBrainz Discogs FreeDB]
-2026/02/02 20:04:18 [METADATA HANDLER] Creating aggregator and starting search...
-2026/02/02 20:04:18 [METADATA SEARCH] Starting search - Artist: 'Ultravox', Album: 'Lament'
-2026/02/02 20:04:18 [METADATA SEARCH] Available providers: 4
-2026/02/02 20:04:18 [METADATA SEARCH]   - MusicBrainz
-2026/02/02 20:04:18 [METADATA SEARCH]   - Discogs
-2026/02/02 20:04:18 [METADATA SEARCH]   - FreeDB
-2026/02/02 20:04:18 [METADATA SEARCH]   - AlbumArt.digital
-2026/02/02 20:04:18 [METADATA SEARCH] Active providers after filtering: 3
-2026/02/02 20:04:18 [METADATA SEARCH]   - MusicBrainz
-2026/02/02 20:04:18 [METADATA SEARCH]   - Discogs
-2026/02/02 20:04:18 [METADATA SEARCH]   - FreeDB
-2026/02/02 20:04:18 [METADATA SEARCH] Starting parallel search across 3 providers
-2026/02/02 20:04:18 [METADATA SEARCH] [FreeDB] Starting search
-2026/02/02 20:04:18 [METADATA SEARCH] [MusicBrainz] Starting search
-2026/02/02 20:04:18 [MUSICBRAINZ] Search called with artist='Ultravox', album='Lament'
-2026/02/02 20:04:18 [MUSICBRAINZ] Query URL params: query='artist:"Ultravox" AND release:"Lament"', type='album', limit='20'
-2026/02/02 20:04:18 [MUSICBRAINZ] Sending request to: https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album (attempt 1/3)
-2026/02/02 20:04:18 [METADATA SEARCH] [Discogs] Starting search
-2026/02/02 20:04:18 [METADATA SEARCH] [Discogs] Error: Discogs token not configured
-2026/02/02 20:04:18 [METADATA SEARCH] [FreeDB] Error: FreeDB: Post "https://freedb.freedb.org/~cddb/cddb.cgi": dial tcp: lookup freedb.freedb.org on 192.168.1.111:53: no such host
-2026/02/02 20:04:18 [MUSICBRAINZ] Retryable error on attempt 1/3: Get "https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album": EOF, retrying...
-2026/02/02 20:04:19 [MUSICBRAINZ] Sending request to: https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album (attempt 2/3)
-2026/02/02 20:04:19 [MUSICBRAINZ] Retryable error on attempt 2/3: Get "https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album": EOF, retrying...
-2026/02/02 20:04:21 [MUSICBRAINZ] Sending request to: https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album (attempt 3/3)
-2026/02/02 20:04:21 [MUSICBRAINZ] Retryable error on attempt 3/3: Get "https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album": EOF, retrying...
-2026/02/02 20:04:21 [MUSICBRAINZ] HTTP request failed: Get "https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album": EOF
-2026/02/02 20:04:21 [METADATA SEARCH] [MusicBrainz] Error: MusicBrainz: Get "https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album": EOF
-2026/02/02 20:04:21 [METADATA SEARCH] All providers completed. Total candidates before deduplication: 0
-2026/02/02 20:04:21 [METADATA SEARCH] After deduplication: 0 candidates
-2026/02/02 20:04:21 [METADATA SEARCH] Final results (sorted by confidence):
-2026/02/02 20:04:21 [METADATA HANDLER] Search completed successfully. Returning 0 candidates
-2026/02/02 20:04:21 [MUSICBRAINZ] Search called with artist='Ultravox', album='Lament'
-2026/02/02 20:04:21 [MUSICBRAINZ] Query URL params: query='artist:"Ultravox" AND release:"Lament"', type='album', limit='20'
-2026/02/02 20:04:21 [MUSICBRAINZ] Sending request to: https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album (attempt 1/3)
-2026/02/02 20:04:21 [MUSICBRAINZ] Retryable error on attempt 1/3: Get "https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album": EOF, retrying...
-2026/02/02 20:04:22 [MUSICBRAINZ] Sending request to: https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album (attempt 2/3)
-2026/02/02 20:04:22 [MUSICBRAINZ] Retryable error on attempt 2/3: Get "https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album": EOF, retrying...
-2026/02/02 20:04:24 [MUSICBRAINZ] Sending request to: https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album (attempt 3/3)
-2026/02/02 20:04:24 [MUSICBRAINZ] Retryable error on attempt 3/3: Get "https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album": EOF, retrying...
-2026/02/02 20:04:24 [MUSICBRAINZ] HTTP request failed: Get "https://musicbrainz.org/ws/2/release-group/?fmt=json&limit=20&query=artist%3A%22Ultravox%22+AND+release%3A%22Lament%22&type=album": EOF
-2026/02/02 21:30:31 Shutting down server...
+2026/02/13 22:33:13 Starting album cache refresh...
+2026/02/13 22:33:14 [DEBUG MPD LIST] Genre = '' (ctx: artist='', date='', genre='')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Date = '' (ctx: artist='', date='', genre='')
+2026/02/13 22:33:14 [DEBUG MPD LIST] AlbumArtist = '' (ctx: artist='', date='', genre='')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = '' (ctx: artist='', date='', genre='')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'youtube.com/watch?v=Pu6YCozUqE0' (ctx: artist='', date='', genre='')
+2026/02/13 22:33:14 [DEBUG MPD LIST] AlbumArtist = '...And You Will Know Us By The Trail Of Dead' (ctx: artist='', date='', genre='')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'live 2004-07-15' (ctx: artist='...And You Will Know Us By The Trail Of Dead', date='', genre='')
+2026/02/13 22:33:14 [DEBUG MPD LIST] AlbumArtist = 'Aksak Maboul' (ctx: artist='...And You Will Know Us By The Trail Of Dead', date='', genre='')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Crammed Global Soundclash 1980-89, Part One: World Fusion' (ctx: artist='Aksak Maboul', date='', genre='')
+2026/02/13 22:33:14 [DEBUG MPD LIST] AlbumArtist = 'Albert Ayler' (ctx: artist='Aksak Maboul', date='', genre='')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Apr 16 Cleveland - Albert Ayler Quintet' (ctx: artist='Albert Ayler', date='', genre='')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Clear' (ctx: artist='Cybotron', date='1990', genre='')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Enter' (ctx: artist='Cybotron', date='1983', genre='Electronic')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Entertainment' (ctx: artist='Fischerspooner', date='2009', genre='electro')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'One Clear Moment' (ctx: artist='Linda Thompson', date='2007', genre='folk')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Wild and Clear and Blue' (ctx: artist='I'm With Her', date='2025', genre='folk')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Vol.5 - Supplique Pour être Enterré à La Plage De Sète' (ctx: artist='Georges Brassens', date='1966', genre='france')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Clear Out Of This' (ctx: artist='Helen Merrill', date='1992', genre='jazz')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Turn to Clear View' (ctx: artist='Joe Armon-Jones', date='2019', genre='jazz')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'The Clearing' (ctx: artist='JJJJJerome Ellis', date='2021', genre='jazz')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Slum Clearance' (ctx: artist='The Siddeleys', date='2001', genre='pop')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Enter The Wu-Tang (36 Chambers)' (ctx: artist='Wu-Tang Clan', date='1993', genre='rap')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Clear Lake Audiotorium' (ctx: artist='De La Soul', date='1994', genre='rap')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Let Me Entertain You' (ctx: artist='Ann-Margret', date='1965', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Creedence Clearwater Revival' (ctx: artist='Creedence Clearwater Revival', date='1968', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Family Entertainment' (ctx: artist='Family', date='1969', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Clear Spot' (ctx: artist='Captain Beefheart & His Magic Band', date='1972', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'I Can See Clearly Now' (ctx: artist='Johnny Nash', date='1972', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'live at Entermedia Theatre, New York, NY, 8/10/1978 - More Songs About Buildings and Food' (ctx: artist='Talking Heads', date='1978', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Entertainment!' (ctx: artist='Gang Of Four', date='1979', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'New Clear Days' (ctx: artist='The Vapors', date='1980', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Clear' (ctx: artist='Bomb the Bass', date='1995', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Clear Eyes' (ctx: artist='Ivan Král', date='1998', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'The Entertainist' (ctx: artist='Gonzales', date='2000', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'The Coast is Never Clear' (ctx: artist='Beulah', date='2001', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Slum Clearance [ytdl]' (ctx: artist='The Siddeleys', date='2001', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Nu-Clear Sounds' (ctx: artist='Ash', date='2004', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'In The Clear' (ctx: artist='IVY', date='2005', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'In The Clear' (ctx: artist='Ivy', date='2005', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Enter The Vaselines' (ctx: artist='The Vaselines', date='2009', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Enter The Vaselines - demo/live' (ctx: artist='The Vaselines', date='2009', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Clear Moon' (ctx: artist='Mount Eerie', date='2012', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Enter The Slasher House' (ctx: artist='Slasher Flicks', date='2014', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'The Clearing' (ctx: artist='The Twilite Tone', date='2020', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Entering Heaven Alive' (ctx: artist='Jack White', date='2022', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Clear Pond Road' (ctx: artist='Kristin Hersh', date='2023', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Salvage Enterprise' (ctx: artist='The Polyphonic Spree', date='2023', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'The Clearing' (ctx: artist='Wolf Alice', date='2025', genre='rock')
+2026/02/13 22:33:14 [DEBUG MPD LIST] Album = 'Volt & Enterprise Singles - The Spirit Of Memphis (1962-1976)' (ctx: artist='Isaac Hayes', date='1976', genre='soul')
+2026/02/13 22:33:14 Fetched 28386 album keys in 1.38931995s
+2026/02/13 22:33:14 Refreshed cache with 28386 albums in 1.530704004s
+2026/02/13 22:33:14 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:15 [MPD] CommandList (3 cmds) took 583.788202ms
+2026/02/13 22:33:15 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:15 [AlbumCache] Enriching batch 3-6 (3 albums)
+2026/02/13 22:33:15 [MPD] CommandList (3 cmds) took 583.254731ms
+2026/02/13 22:33:15 [AlbumCache] Completed batch 3-6
+2026/02/13 22:33:15 [AlbumCache] Enriching batch 6-9 (3 albums)
+2026/02/13 22:33:16 [MPD] CommandList (3 cmds) took 583.570643ms
+2026/02/13 22:33:16 [AlbumCache] Completed batch 6-9
+2026/02/13 22:33:16 [AlbumCache] Enriching batch 9-10 (1 albums)
+2026/02/13 22:33:16 [MPD] CommandList (1 cmds) took 196.142502ms
+2026/02/13 22:33:16 [AlbumCache] Completed batch 9-10
+2026/02/13 22:33:16 Random buffer appended 10 items. Size: 10
+2026/02/13 22:33:16 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:17 [MPD] CommandList (3 cmds) took 582.693995ms
+2026/02/13 22:33:17 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:17 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:17 [MPD] CommandList (2 cmds) took 388.928312ms
+2026/02/13 22:33:17 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:17 Random buffer appended 5 items. Size: 15
+2026/02/13 22:33:18 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:18 [MPD] CommandList (3 cmds) took 582.988473ms
+2026/02/13 22:33:18 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:18 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:18 [MPD] CommandList (2 cmds) took 389.157539ms
+2026/02/13 22:33:18 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:18 Random buffer appended 5 items. Size: 20
+2026/02/13 22:33:19 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:19 [MPD] CommandList (3 cmds) took 582.775122ms
+2026/02/13 22:33:19 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:19 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:20 [MPD] CommandList (2 cmds) took 391.740758ms
+2026/02/13 22:33:20 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:20 Random buffer appended 5 items. Size: 25
+2026/02/13 22:33:20 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:20 [MPD] CommandList (3 cmds) took 584.119104ms
+2026/02/13 22:33:20 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:20 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:21 [MPD] CommandList (2 cmds) took 390.0073ms
+2026/02/13 22:33:21 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:21 Random buffer appended 5 items. Size: 30
+2026/02/13 22:33:21 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:22 [MPD] CommandList (3 cmds) took 583.38594ms
+2026/02/13 22:33:22 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:22 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:22 [MPD] CommandList (2 cmds) took 388.080514ms
+2026/02/13 22:33:22 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:22 Random buffer appended 5 items. Size: 35
+2026/02/13 22:33:22 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:23 [MPD] CommandList (3 cmds) took 583.307439ms
+2026/02/13 22:33:23 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:23 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:23 [MPD] CommandList (2 cmds) took 395.314702ms
+2026/02/13 22:33:23 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:23 Random buffer appended 5 items. Size: 40
+2026/02/13 22:33:23 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:24 [MPD] CommandList (3 cmds) took 583.51621ms
+2026/02/13 22:33:24 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:24 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:24 [MPD] CommandList (2 cmds) took 389.528556ms
+2026/02/13 22:33:24 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:24 Random buffer appended 5 items. Size: 45
+2026/02/13 22:33:25 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:25 [MPD] CommandList (3 cmds) took 583.869257ms
+2026/02/13 22:33:25 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:25 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:26 [MPD] CommandList (2 cmds) took 388.597126ms
+2026/02/13 22:33:26 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:26 Random buffer appended 5 items. Size: 50
+2026/02/13 22:33:26 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:26 [MPD] CommandList (3 cmds) took 581.78701ms
+2026/02/13 22:33:26 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:26 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:27 [MPD] CommandList (2 cmds) took 389.668959ms
+2026/02/13 22:33:27 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:27 Random buffer appended 5 items. Size: 55
+2026/02/13 22:33:27 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:28 [MPD] CommandList (3 cmds) took 583.554585ms
+2026/02/13 22:33:28 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:28 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:28 [MPD] CommandList (2 cmds) took 389.184343ms
+2026/02/13 22:33:28 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:28 Random buffer appended 5 items. Size: 60
+2026/02/13 22:33:28 [MPD] CommandList (2 cmds) took 390.529493ms
+2026/02/13 22:33:28 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:29 [MPD] CommandList (3 cmds) took 583.149499ms
+2026/02/13 22:33:29 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:29 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:29 [MPD] CommandList (2 cmds) took 389.630981ms
+2026/02/13 22:33:29 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:29 Random buffer appended 5 items. Size: 65
+2026/02/13 22:33:29 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:30 [MPD] CommandList (3 cmds) took 582.852026ms
+2026/02/13 22:33:30 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:30 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:30 [MPD] CommandList (2 cmds) took 389.137687ms
+2026/02/13 22:33:30 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:30 Random buffer appended 5 items. Size: 70
+2026/02/13 22:33:31 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:31 [MPD] CommandList (3 cmds) took 582.699595ms
+2026/02/13 22:33:31 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:31 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:31 [MPD] CommandList (2 cmds) took 389.80138ms
+2026/02/13 22:33:31 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:31 Random buffer appended 5 items. Size: 75
+2026/02/13 22:33:32 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:32 [MPD] CommandList (3 cmds) took 582.226887ms
+2026/02/13 22:33:32 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:32 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:33 [MPD] CommandList (2 cmds) took 389.842734ms
+2026/02/13 22:33:33 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:33 Random buffer appended 5 items. Size: 80
+2026/02/13 22:33:33 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:33 [MPD] CommandList (3 cmds) took 582.675334ms
+2026/02/13 22:33:33 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:33 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:34 [MPD] CommandList (2 cmds) took 388.881314ms
+2026/02/13 22:33:34 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:34 Random buffer appended 5 items. Size: 85
+2026/02/13 22:33:34 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:35 [MPD] CommandList (3 cmds) took 599.187775ms
+2026/02/13 22:33:35 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:35 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:35 [MPD] CommandList (2 cmds) took 390.160277ms
+2026/02/13 22:33:35 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:35 Random buffer appended 5 items. Size: 90
+2026/02/13 22:33:35 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:36 [MPD] CommandList (3 cmds) took 587.351949ms
+2026/02/13 22:33:36 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:36 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:36 [MPD] CommandList (2 cmds) took 392.818571ms
+2026/02/13 22:33:36 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:36 Random buffer appended 5 items. Size: 95
+2026/02/13 22:33:36 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:37 [MPD] CommandList (3 cmds) took 583.087894ms
+2026/02/13 22:33:37 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:37 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:37 [MPD] CommandList (2 cmds) took 391.984654ms
+2026/02/13 22:33:37 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:37 Random buffer appended 5 items. Size: 100
+2026/02/13 22:33:38 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:38 [MPD] CommandList (3 cmds) took 582.639142ms
+2026/02/13 22:33:38 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:38 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:39 [MPD] CommandList (2 cmds) took 390.918588ms
+2026/02/13 22:33:39 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:39 Random buffer appended 5 items. Size: 105
+2026/02/13 22:33:39 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:39 [MPD] CommandList (3 cmds) took 584.295508ms
+2026/02/13 22:33:39 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:39 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:40 [MPD] CommandList (2 cmds) took 389.339116ms
+2026/02/13 22:33:40 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:40 Random buffer appended 5 items. Size: 110
+2026/02/13 22:33:40 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:41 [MPD] CommandList (3 cmds) took 583.058545ms
+2026/02/13 22:33:41 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:41 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:41 [MPD] CommandList (2 cmds) took 391.428581ms
+2026/02/13 22:33:41 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:41 Random buffer appended 5 items. Size: 115
+2026/02/13 22:33:41 [AlbumCache] Enriching batch 0-3 (3 albums)
+2026/02/13 22:33:42 [MPD] CommandList (3 cmds) took 583.071199ms
+2026/02/13 22:33:42 [AlbumCache] Completed batch 0-3
+2026/02/13 22:33:42 [AlbumCache] Enriching batch 3-5 (2 albums)
+2026/02/13 22:33:42 [MPD] CommandList (2 cmds) took 389.181579ms
+2026/02/13 22:33:42 [AlbumCache] Completed batch 3-5
+2026/02/13 22:33:42 Random buffer appended 5 items. Size: 120
+2026/02/13 22:34:30 Shutting down server...

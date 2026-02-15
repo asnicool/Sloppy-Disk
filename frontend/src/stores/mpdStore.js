@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
 import { albumCache } from '@/services/albumCache'
+import { n50Service } from '@/services/n50'
 
 const API_BASE = '/api'
 
@@ -22,6 +23,13 @@ export const useMpdStore = defineStore('mpd', () => {
   const currentBackoffIndex = ref(0)
   const backoffLevels = [10000, 60000, 600000] // 10s, 1m, 10m
   
+  // Database update notification
+  const lastDatabaseUpdate = ref(null)
+  
+  // All albums for matrix generation (Phase 1)
+  const allAlbums = ref([])
+  const isLoadingAlbums = ref(false)
+  
   // Search state
   const searchResults = ref({
     albums: [],
@@ -32,12 +40,51 @@ export const useMpdStore = defineStore('mpd', () => {
   })
   const isSearching = ref(false)
 
+  // N50 State
+  const n50Status = ref(null)
+  const n50Inputs = ref([])
+  const isLoadingN50 = ref(false)
+
+  // Computed: Genre/Date Matrix (Phase 1)
+  const genreDateMatrix = computed(() => {
+    if (!allAlbums.value || allAlbums.value.length === 0) {
+      return { genres: [], dates: [], matrix: {} }
+    }
+    
+    const matrix = {}
+    const allGenres = new Set()
+    const allDates = new Set()
+    
+    // Build matrix from albums
+    for (const album of allAlbums.value) {
+      const genre = album.genre || 'Unknown'
+      const date = album.date ? String(album.date).substring(0, 4) : 'Unknown'
+      
+      allGenres.add(genre)
+      allDates.add(date)
+      
+      if (!matrix[genre]) {
+        matrix[genre] = {}
+      }
+      matrix[genre][date] = (matrix[genre][date] || 0) + 1
+    }
+    
+    // Sort genres alphabetically
+    const genres = Array.from(allGenres).sort()
+    
+    // Sort dates descending (newest first)
+    const dates = Array.from(allDates).sort((a, b) => b.localeCompare(a))
+    
+    return { genres, dates, matrix }
+  })
+
   // Getters
   const currentSong = computed(() => status.value?.currentSong)
   const isPlaying = computed(() => status.value?.state === 'play')
   const currentTime = computed(() => status.value?.elapsed || 0)
   const duration = computed(() => status.value?.duration || 0)
   const volume = computed(() => status.value?.volume || 0)
+  const isN50Enabled = computed(() => config.value?.n50Enabled || false)
 
   // Actions
   const connect = async () => {
@@ -51,10 +98,32 @@ export const useMpdStore = defineStore('mpd', () => {
       
       connectWebSocket()
       connectSearchWebSocket()
+      
+      // Load all albums for matrix (Phase 1)
+      loadAllAlbums()
     } catch (error) {
       console.error('Failed to connect to MPD:', error)
       isConnected.value = false
       connectionError.value = error.message
+    }
+  }
+
+  // Load all albums for matrix generation (Phase 1)
+  const loadAllAlbums = async () => {
+    if (isLoadingAlbums.value) return
+    
+    isLoadingAlbums.value = true
+    try {
+      console.log('[MPD Store] Loading all albums for matrix...')
+      const response = await axios.get(`${API_BASE}/albums/all`)
+      if (response.data.success) {
+        allAlbums.value = response.data.data || []
+        console.log(`[MPD Store] Loaded ${allAlbums.value.length} albums`)
+      }
+    } catch (error) {
+      console.error('[MPD Store] Failed to load all albums:', error)
+    } finally {
+      isLoadingAlbums.value = false
     }
   }
 
@@ -105,6 +174,20 @@ export const useMpdStore = defineStore('mpd', () => {
               }
               console.log('Status updated via WebSocket:', status.value?.state, status.value?.currentSong?.title)
             }
+          } else if (msg.type === 'database_update') {
+            // Handle database update notification
+            console.log('[MPD Store] Database update received:', msg.data)
+            lastDatabaseUpdate.value = msg.data
+            
+            // Clear all caches
+            albumCache.clear()
+            console.log('[MPD Store] Album cache cleared due to database update')
+            
+            // Reload all albums for matrix (Phase 1)
+            loadAllAlbums()
+            
+            // Dispatch custom event for components to listen to
+            window.dispatchEvent(new CustomEvent('database-updated', { detail: msg.data }))
           }
         } catch (error) {
           console.error('WebSocket message parse error:', error)
@@ -292,6 +375,16 @@ export const useMpdStore = defineStore('mpd', () => {
     }
   }
 
+  const fetchGenreDateMatrix = async () => {
+    try {
+      const response = await axios.get(`${API_BASE}/genres/matrix`)
+      return response.data
+    } catch (error) {
+      console.error('Fetch genre/date matrix failed:', error)
+      throw error
+    }
+  }
+
   const fetchAlbumSongs = async (artist, album, page = 1, limit = 50, forceRefresh = false) => {
     try {
       const params = new URLSearchParams({
@@ -466,69 +559,11 @@ export const useMpdStore = defineStore('mpd', () => {
       if (addedCount === 0) return
 
       if (mode === 'next') {
-        // Move added tracks to after current song
-        // Added tracks are at [startLength, ..., newLength - 1]
-        // Target is currentPos + 1
         let target = currentPos + 1
-        
-        // We need to move them one by one. 
-        // Note: Moving an item shifts indices.
-        // If we move the last item to target, it shifts everything down.
-        // Let's iterate and move each added track to target + i
-        
-        // Strategy:
-        // We have tracks at the end.
-        // Move the first added track (at startLength) to target.
-        // Now the second added track is at startLength + 1? No, it shifted?
-        // Wait, if startLength=100, target=5.
-        // Move 100 -> 5. 100 is now at 5. Old 5 is at 5? No, old 5 is at 4? Wait.
-        // Insert AT target.
-        // If I move 100 to 5. Item at 5 shifts to 6.
-        // So effectively, I want to move startLength to target.
-        // Then startLength + 1 (which is now at startLength + 1 because we inserted before it? No.)
-        // Let's look at indexes.
-        // [A, B, C ... X, Y, Z] (Length L)
-        // Add [1, 2]. -> [A..Z, 1, 2]. (1 at L, 2 at L+1).
-        // Move 1 (from L) to 5. -> [A..4, 1, 5..Z, 2].
-        // Now 2 is at L+1.
-        // Move 2 (from L+1) to 6. -> [A..4, 1, 2, 5..Z].
-        // So yes, I can just move the calculated indices.
-        
-        // However, we must be careful if target > startLength (e.g. playing near end).
-        // If playing at 99 (of 100). Add 2 -> 102.
-        // Target 100.
-        // Move 100 to 100? No-op.
-        // Move 101 to 101? No-op.
-        // It works naturally.
-
         for (let i = 0; i < addedCount; i++) {
-           // The track to move is always at startLength + i (initially).
-           // BUT, after moving previous tracks, does it shift?
-           // If we move from L to T (T < L).
-           // Everything from T to L-1 shifts +1.
-           // L+1 shifts? No. L+1 stays at L+1?
-           // Actually, if we use IDs it's easier, but we use Pos.
-           
-           // Let's try separate moves.
-           // We are moving `startLength + i` to `target + i`.
-            
-           // Example: [0, 1, 2, 3]. Curr=1. Target=2.
-           // Add [A, B]. -> [0, 1, 2, 3, A, B]. (A at 4, B at 5).
-           // Move A (4) to 2.
-           // Result: [0, 1, A, 2, 3, B]. (2->3, 3->4, B->5).
-           // B is still at 5.
-           // Move B (5) to 3.
-           // Result: [0, 1, A, B, 2, 3].
-           // DONE.
-           
-           // So yes, `move startLength + i` to `target + i` works IF target <= startLength.
-           // IF target > startLength (impossible if adding to end, unless startLength IS target).
-           
            await axios.post(`${API_BASE}/playlist/move`, { from: startLength + i, to: target + i })
         }
       } else if (mode === 'play') {
-          // Play the first added track.
-          // It is at startLength.
           await playTrack(startLength)
       }
       
@@ -539,9 +574,39 @@ export const useMpdStore = defineStore('mpd', () => {
     }
   }
 
+  // Aggressive refresh after user actions for immediate UI feedback
+  const aggressiveRefresh = async () => {
+    console.log('[MPD Store] Aggressive refresh triggered after user action')
+    try {
+      // Fetch both status and playlist in parallel for speed
+      const [statusResponse, playlistResponse] = await Promise.all([
+        axios.get(`${API_BASE}/status`),
+        axios.get(`${API_BASE}/playlist`)
+      ])
+      
+      if (statusResponse.data.data) {
+        status.value = statusResponse.data.data
+        if (statusResponse.data.data.playlistPos !== undefined) {
+          playlistCurrentPos.value = statusResponse.data.data.playlistPos
+        }
+      }
+      
+      if (playlistResponse.data.success) {
+        playlist.value = playlistResponse.data.data.items
+        playlistCurrentPos.value = playlistResponse.data.data.currentPos
+      }
+      
+      console.log('[MPD Store] Aggressive refresh complete')
+    } catch (error) {
+      console.error('[MPD Store] Aggressive refresh failed:', error)
+    }
+  }
+
   const playTrack = async (pos) => {
     try {
       await axios.post(`${API_BASE}/play/${pos}`)
+      // Trigger aggressive refresh for immediate UI update
+      await aggressiveRefresh()
     } catch (error) {
       console.error('Play track failed:', error)
       throw error
@@ -599,15 +664,24 @@ export const useMpdStore = defineStore('mpd', () => {
         coverArtRoot: newConfig.coverArtRoot,
         coverArtBaseUrl: newConfig.coverArtBaseUrl,
         discogsToken: newConfig.discogsToken,
+        discogsKey: newConfig.discogsKey,
+        discogsSecret: newConfig.discogsSecret,
         albumArtApiKey: newConfig.albumArtApiKey,
         rsyncRemoteTarget: newConfig.rsyncRemoteTarget,
         rsyncOptions: newConfig.rsyncOptions,
+        randomAlbumCount: newConfig.randomAlbumCount,
         enableActivityRefresh: newConfig.enableActivityRefresh,
         musicBrainzEnabled: newConfig.musicBrainzEnabled,
         discogsEnabled: newConfig.discogsEnabled,
         freeDbEnabled: newConfig.freeDbEnabled, // Legacy support
         gnuDbEnabled: newConfig.gnuDbEnabled,
-        albumArtEnabled: newConfig.albumArtEnabled
+        albumArtEnabled: newConfig.albumArtEnabled,
+        n50Enabled: newConfig.n50Enabled,
+        n50Host: newConfig.n50Host,
+        n50Port: newConfig.n50Port,
+        n50Input: newConfig.n50Input,
+        n50AutoControl: newConfig.n50AutoControl,
+        n50IgnoreOnStart: newConfig.n50IgnoreOnStart
       }
       
       const response = await axios.post(`${API_BASE}/config`, configToSend)
@@ -794,6 +868,69 @@ export const useMpdStore = defineStore('mpd', () => {
     }
   }
 
+  // N50 Actions
+  const fetchN50Status = async () => {
+    try {
+      isLoadingN50.value = true
+      const response = await n50Service.getStatus()
+      if (response.success) {
+        n50Status.value = response.data
+      }
+      return response
+    } catch (error) {
+      console.error('Fetch N50 status failed:', error)
+      throw error
+    } finally {
+      isLoadingN50.value = false
+    }
+  }
+
+  const fetchN50Inputs = async () => {
+    try {
+      const response = await n50Service.getAvailableInputs()
+      if (response.success) {
+        n50Inputs.value = response.data.inputs || []
+      }
+      return response
+    } catch (error) {
+      console.error('Fetch N50 inputs failed:', error)
+      throw error
+    }
+  }
+
+  const n50PowerOn = async () => {
+    try {
+      const response = await n50Service.powerOn()
+      await fetchN50Status()
+      return response
+    } catch (error) {
+      console.error('N50 power on failed:', error)
+      throw error
+    }
+  }
+
+  const n50PowerOff = async () => {
+    try {
+      const response = await n50Service.powerOff()
+      await fetchN50Status()
+      return response
+    } catch (error) {
+      console.error('N50 power off failed:', error)
+      throw error
+    }
+  }
+
+  const n50SetInput = async (input) => {
+    try {
+      const response = await n50Service.setInput(input)
+      await fetchN50Status()
+      return response
+    } catch (error) {
+      console.error('N50 set input failed:', error)
+      throw error
+    }
+  }
+
   return {
     // State
     status,
@@ -804,6 +941,12 @@ export const useMpdStore = defineStore('mpd', () => {
     config,
     searchResults,
     isSearching,
+    n50Status,
+    n50Inputs,
+    isLoadingN50,
+    lastDatabaseUpdate,
+    allAlbums,
+    isLoadingAlbums,
     
     // Getters
     currentSong,
@@ -811,6 +954,8 @@ export const useMpdStore = defineStore('mpd', () => {
     currentTime,
     duration,
     volume,
+    isN50Enabled,
+    genreDateMatrix,
     
     // Actions
     connect,
@@ -842,14 +987,21 @@ export const useMpdStore = defineStore('mpd', () => {
     getCacheStats,
     clearCache,
     invalidateAlbumCache,
-     fetchCoverArtCandidates,
-     applyCoverArt,
-     fetchMetadataCandidates,
-     fetchMetadataDetails,
-     applyMetadata,
+    fetchCoverArtCandidates,
+    applyCoverArt,
+    fetchMetadataCandidates,
+    fetchMetadataDetails,
+    applyMetadata,
     startPolling,
     stopPolling,
     getSyncStatus,
-    startSync
+    startSync,
+    fetchN50Status,
+    fetchN50Inputs,
+    n50PowerOn,
+    n50PowerOff,
+    n50SetInput,
+    fetchGenreDateMatrix,
+    loadAllAlbums
   }
 })

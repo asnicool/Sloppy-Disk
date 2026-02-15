@@ -63,19 +63,16 @@ func HandleAlbumList(w http.ResponseWriter, r *http.Request) {
 		// or simpler: just get the slice again to get total, but use cached albums.
 		_, total = cache.GetAlbumsPage(offset, limit, sortMode)
 
-		// If we hit the cache, pre-load the NEXT page
-		go cache.BackgroundEnrichAndCache(offset+limit, limit, sortMode)
+		// REMOVED: Background enrichment calls - no longer called
+		// Album details will be loaded opportunistically when cards are viewed
 	} else {
 		// Cache miss: Get basic albums
 		albums, total = cache.GetAlbumsPage(offset, limit, sortMode)
 
 		// Return basic albums immediately (FAST)
 
-		// Trigger background enrich for THIS page (so it's ready if user comes back)
-		go cache.BackgroundEnrichAndCache(offset, limit, sortMode)
-
-		// Trigger background enrich for NEXT page (so it's ready when user clicks next)
-		go cache.BackgroundEnrichAndCache(offset+limit, limit, sortMode)
+		// REMOVED: Background enrichment goroutines
+		// Album details will be loaded opportunistically when cards are viewed
 	}
 
 	response := models.APIResponse{
@@ -223,6 +220,8 @@ type BatchDetailsRequest struct {
 }
 
 // HandleAlbumDetailsBatch handles /api/albums/details/batch
+// Uses MPD command lists to fetch multiple albums in a single round-trip
+// This is significantly faster than sequential individual requests
 func HandleAlbumDetailsBatch(w http.ResponseWriter, r *http.Request) {
 	var req BatchDetailsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -230,24 +229,95 @@ func HandleAlbumDetailsBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit batch size to prevent overwhelming MPD and ensure status/playlist availability
+	const maxBatchSize = 10
+	if len(req.Albums) > maxBatchSize {
+		SendError(w, http.StatusBadRequest, fmt.Sprintf("Batch size exceeds maximum of %d", maxBatchSize))
+		return
+	}
+
+	start := time.Now()
 	results := make(map[string]interface{})
 	cache := albumcache.GetCache()
+
+	// Separate cached from uncached albums
+	type albumRequest struct {
+		Artist string
+		Album  string
+		Key    string
+	}
+	var toFetch []albumRequest
 
 	for _, a := range req.Albums {
 		key := fmt.Sprintf("%s|%s", a.Artist, a.Album)
 		if data, ok := cache.GetAlbumDetails(a.Artist, a.Album); ok {
 			results[key] = data
 		} else {
-			// Fetch individually but inside the loop
-			// The MPD client semaphore will throttle these requests
-			data, err := fetchDetailedAlbumInfo(a.Artist, a.Album)
-			if err == nil {
-				cache.SetAlbumDetails(a.Artist, a.Album, data)
-				results[key] = data
-			} else {
-				log.Printf("Failed to fetch batch details for %s - %s: %v", a.Artist, a.Album, err)
+			toFetch = append(toFetch, albumRequest{
+				Artist: a.Artist,
+				Album:  a.Album,
+				Key:    key,
+			})
+		}
+	}
+
+	// Batch fetch using MPD command list for efficiency
+	if len(toFetch) > 0 {
+		log.Printf("[BATCH] Fetching %d albums using command list", len(toFetch))
+
+		// Build command list - all find commands in one batch
+		var commands []string
+		for _, item := range toFetch {
+			albumEsc := strings.ReplaceAll(item.Album, "\"", "\\\"")
+			artistEsc := strings.ReplaceAll(item.Artist, "\"", "\\\"")
+			// Try artist first, then albumartist if artist doesn't work
+			cmd := fmt.Sprintf("find album \"%s\" artist \"%s\"", albumEsc, artistEsc)
+			commands = append(commands, cmd)
+		}
+
+		// Execute all commands in ONE round-trip using command list
+		// This is the key optimization - MPD processes all commands in a single network call
+		responses, err := mpd.GetClient().SendCommandList(commands)
+		if err != nil {
+			log.Printf("[BATCH] Command list failed: %v (took %v)", err, time.Since(start))
+			SendError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		// Process responses - parse songs and build album info
+		for i, resp := range responses {
+			if i >= len(toFetch) {
+				break
+			}
+			item := toFetch[i]
+
+			// Parse songs from response
+			songs := parseSongs(resp)
+
+			// If artist filter didn't work, try albumartist
+			if len(songs) == 0 {
+				log.Printf("[BATCH] No songs with artist, trying albumartist for %s - %s", item.Artist, item.Album)
+				// We need to fetch this one individually with albumartist
+				data, fetchErr := fetchDetailedAlbumInfo(item.Artist, item.Album)
+				if fetchErr == nil && data != nil {
+					cache.SetAlbumDetails(item.Artist, item.Album, data)
+					results[item.Key] = data
+				} else {
+					log.Printf("[BATCH] Failed to fetch %s - %s: %v", item.Artist, item.Album, fetchErr)
+				}
+				continue
+			}
+
+			// Build album info from songs
+			if len(songs) > 0 {
+				data := buildAlbumInfoFromSongs(item.Artist, item.Album, songs)
+				cache.SetAlbumDetails(item.Artist, item.Album, data)
+				results[item.Key] = data
 			}
 		}
+
+		log.Printf("[BATCH] Fetched %d albums in %v (avg: %v per album)",
+			len(toFetch), time.Since(start), time.Since(start)/time.Duration(len(toFetch)))
 	}
 
 	SendJSON(w, models.APIResponse{
@@ -327,12 +397,62 @@ func fetchDetailedAlbumInfo(artist, albumName string) (map[string]interface{}, e
 	}, nil
 }
 
+// buildAlbumInfoFromSongs constructs album details from a list of songs
+// This is used by both fetchDetailedAlbumInfo and HandleAlbumDetailsBatch
+func buildAlbumInfoFromSongs(artist, albumName string, songs []models.Song) map[string]interface{} {
+	// Compute stats
+	totalDuration := 0
+	genre := ""
+	date := ""
+	path := ""
+
+	for _, s := range songs {
+		totalDuration += s.Duration
+		if genre == "" && s.Genre != "" {
+			genre = s.Genre
+		}
+		if date == "" && s.Date != "" {
+			date = s.Date
+		}
+		if path == "" {
+			path = filepath.Dir(s.Path)
+		}
+	}
+
+	// Escape path for URL, keeping slashes
+	pathParts := strings.Split(path, "/")
+	for i, part := range pathParts {
+		pathParts[i] = url.PathEscape(part)
+	}
+	escapedPath := strings.Join(pathParts, "/")
+
+	albumInfo := models.Album{
+		Album:      albumName,
+		Artist:     artist,
+		TrackCount: len(songs),
+		Duration:   totalDuration,
+		Genre:      genre,
+		Date:       date,
+		Path:       path,
+		CoverURL:   fmt.Sprintf("/api/coverart/%s", escapedPath),
+	}
+
+	// Prepare data to include both summary and tracklist
+	return map[string]interface{}{
+		"album":  albumInfo,
+		"tracks": songs,
+	}
+}
+
 // HandleAllAlbums handles /api/albums/all
 // Returns all albums from the cache for local search/filtering
+// Enriches albums with track count, duration, and path
 func HandleAllAlbums(w http.ResponseWriter, r *http.Request) {
 	cache := albumcache.GetCache()
 
-	// Get all albums from cache
+	// Get all albums from cache (basic info only)
+	// NO enrichment called - this avoids overwhelming MPD with GetAlbumStats queries
+	// Track count, duration, and path will be loaded opportunistically when needed
 	allAlbums := cache.GetAllAlbums()
 
 	response := models.APIResponse{

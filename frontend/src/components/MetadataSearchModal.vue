@@ -236,14 +236,26 @@
                   </div>
                 </div>
 
-                <div class="pt-2">
+                <div class="pt-2 space-y-3">
                   <button
                     @click.stop="handleApply"
                     :disabled="applying"
                     class="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black uppercase tracking-wider transition-all shadow-lg shadow-green-900/20 disabled:opacity-50"
                   >
-                    {{ applying ? 'Tagging Files...' : 'Apply All changes' }}
+                    {{ applying === 'metadata' ? 'Tagging Files...' : 'Apply All Changes' }}
                   </button>
+                  
+                  <button
+                    @click.stop="handleApplyCoverOnly"
+                    :disabled="applying || !selectedCoverArt"
+                    class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold uppercase tracking-wider transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50"
+                  >
+                    {{ applying === 'cover' ? 'Setting Cover...' : 'Apply Cover Only' }}
+                  </button>
+                  
+                  <p v-if="!selectedCoverArt" class="text-xs text-neutral-500 text-center">
+                    Select a cover image above to enable "Apply Cover Only"
+                  </p>
                   
                   <div v-if="applyResult" class="mt-4 p-4 bg-green-900/20 border border-green-500/30 rounded-xl">
                     <div class="flex items-center gap-2 text-green-400 font-bold text-sm">
@@ -379,7 +391,7 @@ const selectCandidate = async (candidate) => {
 const handleApply = async () => {
   if (!selectedCandidate.value || !props.albumPath) return
   
-  applying.value = true
+  applying.value = 'metadata'
   try {
     const result = await applyMetadata(
       props.albumPath,
@@ -391,6 +403,20 @@ const handleApply = async () => {
     }
   } catch (e) {
     console.error('Failed to apply metadata:', e)
+  } finally {
+    applying.value = false
+  }
+}
+
+const handleApplyCoverOnly = async () => {
+  if (!selectedCoverArt.value || !props.albumPath) return
+  
+  applying.value = 'cover'
+  try {
+    await mpdStore.applyCoverArt(props.albumPath, selectedCoverArt.value.url)
+    emit('coverUpdated')
+  } catch (e) {
+    console.error('Failed to apply cover:', e)
   } finally {
     applying.value = false
   }

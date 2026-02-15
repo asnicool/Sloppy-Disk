@@ -18,10 +18,19 @@
           <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.369 4.369 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" />
         </svg>
         <button 
-          @click="showCoverPicker = true"
+          @click="handleCoverClick"
           class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
         >
-          <span class="text-white text-sm font-medium">Change Cover</span>
+          <div class="flex flex-col items-center space-y-2">
+            <span class="text-white text-sm font-medium">Cover Options</span>
+            <div class="flex items-center space-x-2 text-[10px] font-bold uppercase tracking-wider text-white/40">
+                <span class="px-1.5 py-0.5 border border-white/20 rounded">Click</span>
+                <span>Picker</span>
+                <span class="text-white/20">•</span>
+                <span class="px-1.5 py-0.5 border border-white/20 rounded">Double</span>
+                <span>Zoom</span>
+            </div>
+          </div>
         </button>
       </div>
       
@@ -173,38 +182,79 @@
               <div
                 v-for="(cover, idx) in coverCandidates"
                 :key="idx"
-                class="aspect-square relative group cursor-pointer rounded-lg overflow-hidden bg-neutral-900 border border-neutral-800 hover:border-blue-500 transition-colors"
+                :class="[
+                  'aspect-square relative group cursor-pointer rounded-lg overflow-hidden bg-neutral-900 border transition-all duration-300',
+                  applyingCover === cover.url ? 'border-green-500 ring-2 ring-green-500' : 'border-neutral-800 hover:border-blue-500'
+                ]"
                 @click="selectCover(cover)"
               >
-                <img :src="cover.thumbnail || cover.url" class="w-full h-full object-cover" />
+                <img :src="cover.thumbnail || cover.url" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                 
-                <!-- Dimension Badge -->
-                <div v-if="cover.width && cover.height" class="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/70 backdrop-blur-md rounded text-[9px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                  {{ cover.width }}x{{ cover.height }}
+                <!-- Dimension Legend (Always Visible) -->
+                <div v-if="cover.width && cover.height" class="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-black/80 backdrop-blur-md border-t border-white/10 text-[10px] font-bold text-white flex justify-between items-center z-10">
+                  <span class="opacity-50 uppercase tracking-tighter text-[8px]">Dimensions</span>
+                  <span class="text-blue-400">{{ cover.width }}<span class="text-white/40 mx-0.5">x</span>{{ cover.height }}</span>
                 </div>
 
-                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <span class="text-xs font-bold text-white uppercase tracking-wider">Select</span>
+                <!-- Loading State -->
+                <div v-if="applyingCover === cover.url" class="absolute inset-0 bg-green-600/80 flex items-center justify-center backdrop-blur-[2px]">
+                  <svg class="animate-spin h-8 w-8 text-white" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                </div>
+
+                <!-- Hover State (only show when not loading) -->
+                <div v-else class="absolute inset-0 bg-blue-600/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
+                  <div class="bg-blue-600 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg transform -translate-y-2 group-hover:translate-y-0 transition-transform">
+                    Set Cover
+                  </div>
                 </div>
               </div>
         </div>
       </div>
     </BaseModal>
 
-    <!-- Confirmation Modal -->
-    <BaseConfirmModal
-      v-model="showConfirmModal"
-      title="Update Cover Art"
-      message="Set this as album cover art? This will update the folder image on disk."
-      confirm-label="Set Cover"
-      :loading="applyingCover"
-      @confirm="handleConfirmCover"
-      @cancel="showConfirmModal = false"
+    <!-- Full Screen Cover Overlay -->
+    <Transition
+      enter-active-class="transition duration-300 ease-out"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition duration-200 ease-in"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
     >
-      <div v-if="pendingCover" class="aspect-square w-32 mx-auto rounded-lg overflow-hidden border border-neutral-700 shadow-xl">
-        <img :src="pendingCover.url" class="w-full h-full object-cover" />
+      <div 
+        v-if="showFullScreenCover" 
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 md:p-8"
+        @click="showFullScreenCover = false"
+      >
+        <div class="relative max-w-5xl w-full h-full flex items-center justify-center">
+          <img 
+            :src="albumDetails?.coverUrl + (coverBust ? '?t=' + coverBust : '')" 
+            :alt="albumName"
+            class="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
+            @click.stop
+          />
+          
+          <!-- Close Button -->
+          <button 
+            @click="showFullScreenCover = false"
+            class="absolute top-0 right-0 m-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          <!-- Info Overlay -->
+          <div class="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/80 to-transparent text-white rounded-b-lg">
+            <h2 class="text-3xl font-bold">{{ albumName }}</h2>
+            <p class="text-xl text-neutral-300">{{ artistName }}</p>
+          </div>
+        </div>
       </div>
-    </BaseConfirmModal>
+    </Transition>
   </div>
 </template>
 
@@ -214,7 +264,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
 import BaseToast from '@/components/BaseToast.vue'
 import BaseModal from '@/components/BaseModal.vue'
-import BaseConfirmModal from '@/components/BaseConfirmModal.vue'
 import MetadataSearchModal from '@/components/MetadataSearchModal.vue'
 
 const route = useRoute()
@@ -236,16 +285,33 @@ const showCoverPicker = ref(false)
 const fetchingCovers = ref(false)
 const coverCandidates = ref([])
 const coverBust = ref(0)
+const showFullScreenCover = ref(false)
+const applyingCover = ref(null) // Stores the URL of cover being applied
 
-// Confirmation Modal
-const showConfirmModal = ref(false)
-const pendingCover = ref(null)
-const applyingCover = ref(false)
-
-// Toast Notification
+// Toast notification state
 const showToast = ref(false)
 const toastMessage = ref('')
 const toastType = ref('success')
+
+// Click handling for cover art
+let clickCount = 0
+let clickTimer = null
+
+const handleCoverClick = () => {
+    clickCount++
+    if (clickCount === 1) {
+        clickTimer = setTimeout(() => {
+            if (clickCount === 1) {
+                showCoverPicker.value = true
+            }
+            clickCount = 0
+        }, 250) // 250ms is standard for double click detection
+    } else if (clickCount === 2) {
+        clearTimeout(clickTimer)
+        showFullScreenCover.value = true
+        clickCount = 0
+    }
+}
 
 const showNotification = (message, type = 'success') => {
     toastMessage.value = message
@@ -374,13 +440,13 @@ const reapplyMetadata = async () => {
   const overlay = mpdStore.albumCache.getOverlay(artistName.value, albumName.value)
   if (overlay && overlay.originalMetadata) {
     try {
-      selectionMetadata.value = true // Reusing searching state
+      searchingMetadata.value = true // Reusing searching state
       const result = await mpdStore.applyMetadata(albumPath.value, overlay.originalMetadata)
       handleMetadataApplied(result)
     } catch (error) {
       showNotification('Reapply failed: ' + error.message, 'error')
     } finally {
-      selectionMetadata.value = false
+      searchingMetadata.value = false
     }
   }
 }
@@ -398,20 +464,15 @@ const fetchCovers = async () => {
 }
 
 const selectCover = async (cover) => {
-  pendingCover.value = cover
-  showConfirmModal.value = true
-}
-
-const handleConfirmCover = async () => {
-  if (!pendingCover.value) return
+  // Prevent multiple simultaneous clicks
+  if (applyingCover.value) return
   
-  applyingCover.value = true
+  applyingCover.value = cover.url
   try {
-    const albumPath = tracks.value[0]?.path.split('/').slice(0, -1).join('/')
-    await mpdStore.applyCoverArt(albumPath, pendingCover.value.url)
+    const albumPathValue = tracks.value[0]?.path.split('/').slice(0, -1).join('/')
+    await mpdStore.applyCoverArt(albumPathValue, cover.url)
     showNotification('Cover art updated successfully')
     showCoverPicker.value = false
-    showConfirmModal.value = false
     
     // Cache bust local cover
     coverBust.value = Date.now()
@@ -421,8 +482,7 @@ const handleConfirmCover = async () => {
   } catch (error) {
     showNotification('Failed to update cover art: ' + error.message, 'error')
   } finally {
-    applyingCover.value = false
-    pendingCover.value = null
+    applyingCover.value = null
   }
 }
 

@@ -44,16 +44,17 @@
         >
           <!-- Album Header (Draggable Handle) -->
           <div 
-            class="album-handle relative w-full cursor-grab active:cursor-grabbing"
+            class="album-handle relative w-full cursor-grab active:cursor-grabbing select-none"
             :class="isCompact ? 'h-24' : 'h-40'"
+            v-on="getAlbumCoverHandlers(group)"
           >
             <img 
               v-if="group.coverUrl" 
               :src="group.coverUrl" 
-              class="w-full h-full object-cover"
+              class="w-full h-full object-cover pointer-events-none"
               :class="{ 'grayscale opacity-50': group.isPlayed && !group.hasCurrentTrack }"
             />
-            <div v-else class="w-full h-full bg-neutral-800 flex items-center justify-center">
+            <div v-else class="w-full h-full bg-neutral-800 flex items-center justify-center pointer-events-none">
               <svg class="w-8 h-8 text-neutral-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
               </svg>
@@ -114,13 +115,24 @@
 import { ref, computed } from 'vue'
 import draggable from 'vuedraggable'
 import { useMpdStore } from '@/stores/mpd'
+import { useDoubleTapSimple } from '@/composables/useDoubleTap'
 import QueueTrackList from '@/components/QueueTrackList.vue'
 
 const mpdStore = useMpdStore()
 const isCompact = ref(false)
+const { handlers: doubleTapHandlers } = useDoubleTapSimple({ delay: 300 })
 
 const toggleCompact = () => {
   isCompact.value = !isCompact.value
+}
+
+const playAlbumFromStart = (group) => {
+  // Play the first track of the album (startPos is the position of first track)
+  mpdStore.playTrack(group.startPos)
+}
+
+const getAlbumCoverHandlers = (group) => {
+  return doubleTapHandlers(() => playAlbumFromStart(group))
 }
 
 const groupedPlaylist = computed({

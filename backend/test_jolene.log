@@ -1,6 +1,0 @@
-2026/01/31 16:22:15 Loading configuration from: config.json
-Registering API routes...
-2026/01/31 16:22:15 Initializing album cache...
-2026/01/31 16:22:15 Serving frontend from: ../frontend/dist
-Backend starting on port 7070
-2026/01/31 16:22:15 listen: listen tcp :7070: bind: address already in use

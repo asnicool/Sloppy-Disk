@@ -149,8 +149,10 @@ func (b *Broadcaster) listenForMPDChanges() {
 			// No need to call NoIdle() here.
 
 			// Handle database changes by triggering cache refresh
+			databaseChanged := false
 			for _, subsystem := range changedSubsystems {
 				if subsystem == "database" {
+					databaseChanged = true
 					log.Println("[Broadcaster] Database changed, triggering cache refresh...")
 					go func() {
 						// Import albumcache package to trigger refresh
@@ -160,6 +162,17 @@ func (b *Broadcaster) listenForMPDChanges() {
 						}
 					}()
 				}
+			}
+
+			// Broadcast database update to all clients
+			if databaseChanged {
+				b.BroadcastWS(models.WSMessage{
+					Type: "database_update",
+					Data: map[string]interface{}{
+						"timestamp": time.Now().Unix(),
+						"message":   "Music library has been updated",
+					},
+				})
 			}
 
 			// Only fetch status if relevant subsystems changed

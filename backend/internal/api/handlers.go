@@ -19,6 +19,7 @@ import (
 	"mpd-client-modern/internal/metadata"
 	"mpd-client-modern/internal/models"
 	"mpd-client-modern/internal/mpd"
+	"mpd-client-modern/internal/n50"
 	"mpd-client-modern/internal/sync"
 
 	"github.com/gorilla/mux"
@@ -36,13 +37,13 @@ func RegisterRoutes(r *mux.Router) {
 	// MPD Status
 	api.HandleFunc("/status", GetStatus).Methods("GET")
 
-	// Playback Controls
-	api.HandleFunc("/play", Play).Methods("POST")
-	api.HandleFunc("/play/{pos}", PlayPos).Methods("POST")
+	// Playback Controls (wrapped with N50 check)
+	api.HandleFunc("/play", wrapPlaybackWithN50Check(Play)).Methods("POST")
+	api.HandleFunc("/play/{pos}", wrapPlaybackWithN50Check(PlayPos)).Methods("POST")
 	api.HandleFunc("/pause", Pause).Methods("POST")
 	api.HandleFunc("/stop", Stop).Methods("POST")
-	api.HandleFunc("/next", Next).Methods("POST")
-	api.HandleFunc("/previous", Previous).Methods("POST")
+	api.HandleFunc("/next", wrapPlaybackWithN50Check(Next)).Methods("POST")
+	api.HandleFunc("/previous", wrapPlaybackWithN50Check(Previous)).Methods("POST")
 	api.HandleFunc("/volume/{volume}", SetVolume).Methods("POST")
 
 	// Playlist
@@ -65,6 +66,7 @@ func RegisterRoutes(r *mux.Router) {
 	api.HandleFunc("/artists", ListArtists).Methods("GET")
 	api.HandleFunc("/dates", ListDates).Methods("GET")
 	api.HandleFunc("/genres", ListGenres).Methods("GET")
+	api.HandleFunc("/genres/matrix", GetGenreDateMatrix).Methods("GET")
 	api.HandleFunc("/album/{artist}/{album}", HandleAlbumDetails).Methods("GET")
 	api.HandleFunc("/album/{artist}/{album}/tags", GetAlbumTags).Methods("GET")
 	api.HandleFunc("/album/{artist}/{album}/tags", UpdateAlbumTags).Methods("POST")
@@ -114,16 +116,21 @@ func UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	// Restore the body for decoding
 	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
-	var cfg config.Config
-	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+	var newCfg config.ConfigDTO
+	if err := json.NewDecoder(r.Body).Decode(&newCfg); err != nil {
 		SendError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
 		return
 	}
-	if err := cfg.Validate(); err != nil {
+
+	// Load current config and apply changes
+	currentCfg := config.Get()
+	currentCfg.ApplyDTO(&newCfg)
+
+	if err := currentCfg.Validate(); err != nil {
 		SendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := config.Save(&cfg); err != nil {
+	if err := config.Save(currentCfg); err != nil {
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -131,9 +138,10 @@ func UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	// Reset the MPD client to use the new configuration in a goroutine to avoid blocking
 	go func() {
 		mpd.ResetClient()
+		n50.ResetClient()
 	}()
 
-	SendJSON(w, models.APIResponse{Success: true, Data: cfg})
+	SendJSON(w, models.APIResponse{Success: true, Data: currentCfg})
 }
 
 // GetConnectionStatus returns the current connection status to the MPD server
@@ -152,12 +160,17 @@ func GetConnectionStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetStatus(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[API] GetStatus called")
+	start := time.Now()
+
 	// Use pooled client to avoid head-of-line blocking
 	status, err := mpd.GetClient().GetStatus()
 	if err != nil {
-		SendError(w, http.StatusInternalServerError, err.Error())
+		log.Printf("[API] GetStatus failed: %v (took %v). Response status: 500", err, time.Since(start))
+		SendError(w, http.StatusInternalServerError, "MPD Status Error: "+err.Error())
 		return
 	}
+	log.Printf("[API] GetStatus success (took %v)", time.Since(start))
 	SendJSON(w, models.APIResponse{Success: true, Data: status})
 }
 
@@ -165,7 +178,8 @@ func RefreshStatus(w http.ResponseWriter, r *http.Request) {
 	// Get current status using pooled client to avoid head-of-line blocking
 	status, err := mpd.GetClient().GetStatus()
 	if err != nil {
-		SendError(w, http.StatusInternalServerError, err.Error())
+		log.Printf("[API] RefreshStatus failed: %v. Response status: 500", err)
+		SendError(w, http.StatusInternalServerError, "MPD Refresh Status Error: "+err.Error())
 		return
 	}
 
@@ -566,20 +580,26 @@ func GetCoverArtCandidates(w http.ResponseWriter, r *http.Request) {
 }
 
 func ApplyCoverArt(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[API] ApplyCoverArt called")
 	var req struct {
 		AlbumPath string `json:"albumPath"`
 		ImageURL  string `json:"imageUrl"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("[API] ApplyCoverArt: Failed to decode JSON: %v", err)
 		SendError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
+	log.Printf("[API] ApplyCoverArt: albumPath=%s, imageUrl=%s", req.AlbumPath, req.ImageURL)
+
 	manager := coverart.NewManager()
 	if err := manager.ApplyCover(req.AlbumPath, req.ImageURL); err != nil {
+		log.Printf("[API] ApplyCoverArt: Failed to apply cover: %v", err)
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	log.Printf("[API] ApplyCoverArt: Success")
 	SendJSON(w, models.APIResponse{Success: true})
 }
 
@@ -760,6 +780,9 @@ func PlayPos(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, models.APIResponse{Success: true})
 }
 func GetPlaylist(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[API] GetPlaylist called")
+	start := time.Now()
+
 	// Parse optional pagination
 	page := parseInt(r.URL.Query().Get("page"))
 	limit := parseInt(r.URL.Query().Get("limit"))
@@ -769,25 +792,30 @@ func GetPlaylist(w http.ResponseWriter, r *http.Request) {
 
 	// If pagination is requested
 	if page > 0 && limit > 0 {
+		log.Printf("[API] GetPlaylist: Getting range %d-%d", (page-1)*limit, (page-1)*limit+limit)
 		start := (page - 1) * limit
 		end := start + limit
 		// MPD range is start:end where end is exclusive (usually).
 		// client.GetPlaylistRange uses playlistinfo start:end.
 		items, err = mpd.GetClient().GetPlaylistRange(start, end)
 	} else {
+		log.Printf("[API] GetPlaylist: Getting full playlist")
 		// Get full playlist
 		items, err = mpd.GetClient().GetPlaylist()
 	}
 
 	if err != nil {
+		log.Printf("[API] GetPlaylist: Failed to get items: %v (took %v)", err, time.Since(start))
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	log.Printf("[API] GetPlaylist: Got %d items (took %v)", len(items), time.Since(start))
 
 	// Get current status for current position and playlist length
 	// Use pooled client to avoid head-of-line blocking
 	status, err := mpd.GetClient().GetStatus()
 	if err != nil {
+		log.Printf("[API] GetPlaylist: Failed to get status: %v (took %v)", err, time.Since(start))
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -798,6 +826,7 @@ func GetPlaylist(w http.ResponseWriter, r *http.Request) {
 		CurrentPos: status.PlaylistPos,
 	}
 
+	log.Printf("[API] GetPlaylist: Success (took %v total)", time.Since(start))
 	SendJSON(w, models.APIResponse{Success: true, Data: playlistInfo})
 }
 
@@ -814,6 +843,97 @@ func SendJSON(w http.ResponseWriter, data interface{}) {
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		SendError(w, http.StatusInternalServerError, "Failed to encode JSON: "+err.Error())
 	}
+}
+
+// GetGenreDateMatrix returns a matrix of genre vs date with album counts
+func GetGenreDateMatrix(w http.ResponseWriter, r *http.Request) {
+	// Get all albums with their genre and date
+	resp, err := mpd.GetClient().SendCommand("list album group genre group date")
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	lines := strings.Split(strings.TrimSpace(resp), "\n")
+
+	// Map to store counts: matrix[genre][date] = count
+	matrix := make(map[string]map[string]int)
+	allGenres := make(map[string]bool)
+	allDates := make(map[string]bool)
+
+	var currentGenre, currentDate string
+
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, ": ", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key, value := parts[0], parts[1]
+		switch key {
+		case "Genre":
+			currentGenre = value
+			if currentGenre == "" {
+				currentGenre = "Unknown"
+			}
+			allGenres[currentGenre] = true
+			if matrix[currentGenre] == nil {
+				matrix[currentGenre] = make(map[string]int)
+			}
+		case "Date":
+			currentDate = value
+			if currentDate == "" {
+				currentDate = "Unknown"
+			}
+			// Extract year from date (take first 4 characters if it's a full date)
+			if len(currentDate) >= 4 {
+				currentDate = currentDate[:4]
+			}
+			allDates[currentDate] = true
+		case "Album":
+			if currentGenre != "" && currentDate != "" {
+				matrix[currentGenre][currentDate]++
+			}
+		}
+	}
+
+	// Convert to sorted slices
+	genres := make([]string, 0, len(allGenres))
+	for g := range allGenres {
+		genres = append(genres, g)
+	}
+	sort.Strings(genres)
+
+	dates := make([]string, 0, len(allDates))
+	for d := range allDates {
+		dates = append(dates, d)
+	}
+	// Sort dates in descending order (newest first)
+	sort.Slice(dates, func(i, j int) bool {
+		return dates[i] > dates[j]
+	})
+
+	// Build response structure
+	type MatrixCell struct {
+		Count int    `json:"count"`
+		Genre string `json:"genre"`
+		Date  string `json:"date"`
+	}
+
+	result := struct {
+		Genres []string                  `json:"genres"`
+		Dates  []string                  `json:"dates"`
+		Matrix map[string]map[string]int `json:"matrix"`
+	}{
+		Genres: genres,
+		Dates:  dates,
+		Matrix: matrix,
+	}
+
+	SendJSON(w, models.APIResponse{Success: true, Data: result})
 }
 
 func SendError(w http.ResponseWriter, code int, message string) {

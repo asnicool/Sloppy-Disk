@@ -10,9 +10,9 @@
   >
     <template #item="{ element }">
       <div 
-        class="flex items-center gap-2 p-2 rounded cursor-grab active:cursor-grabbing group transition-colors"
+        class="flex items-center gap-2 p-2 rounded cursor-grab active:cursor-grabbing group transition-colors select-none"
         :class="getTrackClass(element)"
-        @dblclick="playTrack(element.pos)"
+        v-on="getTrackHandlers(element)"
       >
         <!-- Track Number / Playing Indicator -->
         <div class="w-6 flex items-center justify-center">
@@ -51,6 +51,7 @@
 import { computed } from 'vue'
 import draggable from 'vuedraggable'
 import { useMpdStore } from '@/stores/mpd'
+import { useDoubleTapSimple } from '@/composables/useDoubleTap'
 
 const props = defineProps({
   tracks: {
@@ -69,6 +70,7 @@ const props = defineProps({
 
 const emit = defineEmits(['track-move', 'track-remove'])
 const mpdStore = useMpdStore()
+const { handlers: doubleTapHandlers } = useDoubleTapSimple({ delay: 300 })
 
 const getTrackClass = (element) => {
   if (element.isCurrentTrack) {
@@ -82,6 +84,10 @@ const getTrackClass = (element) => {
 
 const playTrack = (pos) => {
   mpdStore.playTrack(pos)
+}
+
+const getTrackHandlers = (element) => {
+  return doubleTapHandlers(() => playTrack(element.pos))
 }
 
 const handleChange = (event) => {
