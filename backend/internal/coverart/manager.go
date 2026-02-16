@@ -148,15 +148,29 @@ func (m *Manager) ApplyCover(albumPath string, imageURL string) error {
 		ext = ".gif"
 	}
 
-	destPath := filepath.Join(destDir, "folder"+ext)
+	// Use capital "Folder" as the standard filename
+	destPath := filepath.Join(destDir, "Folder"+ext)
 	log.Printf("[CoverArt Manager] Destination path: %s", destPath)
 
-	// Remove existing file if it exists
-	if _, err := os.Stat(destPath); err == nil {
-		log.Printf("[CoverArt Manager] Removing existing file: %s", destPath)
-		if err := os.Remove(destPath); err != nil {
-			log.Printf("[CoverArt Manager] Failed to remove existing file: %v", err)
-			return fmt.Errorf("failed to remove existing file %s: %w", destPath, err)
+	// Remove any existing folder/Folder cover art files (case-insensitive cleanup)
+	entries, err := os.ReadDir(destDir)
+	if err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			nameLower := strings.ToLower(entry.Name())
+			// Check if this is a folder.jpg/Folder.jpg variant with any supported extension
+			if strings.HasPrefix(nameLower, "folder.") {
+				oldExt := strings.ToLower(filepath.Ext(entry.Name()))
+				if oldExt == ".jpg" || oldExt == ".jpeg" || oldExt == ".png" || oldExt == ".webp" || oldExt == ".gif" {
+					oldPath := filepath.Join(destDir, entry.Name())
+					log.Printf("[CoverArt Manager] Removing old cover art: %s", oldPath)
+					if err := os.Remove(oldPath); err != nil {
+						log.Printf("[CoverArt Manager] Warning: failed to remove %s: %v", oldPath, err)
+					}
+				}
+			}
 		}
 	}
 
@@ -231,15 +245,29 @@ func (m *Manager) SaveUploadedCover(albumPath string, reader io.Reader, contentT
 		ext = ".gif"
 	}
 
-	destPath := filepath.Join(destDir, "folder"+ext)
+	// Use capital "Folder" as the standard filename
+	destPath := filepath.Join(destDir, "Folder"+ext)
 	log.Printf("[CoverArt Manager] Destination path: %s", destPath)
 
-	// Remove existing file if it exists
-	if _, err := os.Stat(destPath); err == nil {
-		log.Printf("[CoverArt Manager] Removing existing file: %s", destPath)
-		if err := os.Remove(destPath); err != nil {
-			log.Printf("[CoverArt Manager] Failed to remove existing file: %v", err)
-			return fmt.Errorf("failed to remove existing file %s: %w", destPath, err)
+	// Remove any existing folder/Folder cover art files (case-insensitive cleanup)
+	entries, err := os.ReadDir(destDir)
+	if err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			nameLower := strings.ToLower(entry.Name())
+			// Check if this is a folder.jpg/Folder.jpg variant with any supported extension
+			if strings.HasPrefix(nameLower, "folder.") {
+				oldExt := strings.ToLower(filepath.Ext(entry.Name()))
+				if oldExt == ".jpg" || oldExt == ".jpeg" || oldExt == ".png" || oldExt == ".webp" || oldExt == ".gif" {
+					oldPath := filepath.Join(destDir, entry.Name())
+					log.Printf("[CoverArt Manager] Removing old cover art: %s", oldPath)
+					if err := os.Remove(oldPath); err != nil {
+						log.Printf("[CoverArt Manager] Warning: failed to remove %s: %v", oldPath, err)
+					}
+				}
+			}
 		}
 	}
 

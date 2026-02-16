@@ -38,8 +38,8 @@ const routes = [
     component: SearchView
   },
   {
-    path: '/genres',
-    name: 'genres',
+    path: '/genreXdate',
+    name: 'genreXdate',
     component: GenresView
   },
   {

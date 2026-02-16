@@ -1,0 +1,22 @@
+{
+  "mpdHost": "",
+  "mpdPort": 0,
+  "musicRoot": "/mnt/music",
+  "coverArtRoot": "",
+  "coverArtBaseUrl": "",
+  "rsyncRemoteTarget": "",
+  "rsyncOptions": "",
+  "randomAlbumCount": 0,
+  "enableActivityRefresh": false,
+  "musicBrainzEnabled": false,
+  "discogsEnabled": false,
+  "freeDbEnabled": false,
+  "gnuDbEnabled": false,
+  "albumArtEnabled": false,
+  "n50Enabled": false,
+  "n50Host": "",
+  "n50Port": 0,
+  "n50Input": "",
+  "n50AutoControl": false,
+  "n50IgnoreOnStart": false
+}

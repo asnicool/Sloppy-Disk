@@ -1,12 +1,12 @@
+import Fuse from 'fuse.js'
+
 /**
  * Fuzzy matching utilities for search relevance scoring
  */
 
 /**
  * Calculate Levenshtein distance between two strings
- * @param {string} a - First string
- * @param {string} b - Second string
- * @returns {number} - The edit distance
+ * Note: Keep for backward compatibility or simple uses, but Fuse.js is preferred for main search.
  */
 function levenshteinDistance(a, b) {
   const matrix = []
@@ -40,11 +40,8 @@ function levenshteinDistance(a, b) {
 
 /**
  * Calculate similarity score between two strings (0 to 1, where 1 is exact match)
- * @param {string} str1 - First string
- * @param {string} str2 - Second string
- * @returns {number} - Similarity score
  */
-function similarity(str1, str2) {
+export function similarity(str1, str2) {
   if (!str1 || !str2) return 0
   if (str1 === str2) return 1
   
@@ -60,85 +57,111 @@ function similarity(str1, str2) {
 /**
  * Calculate a relevance score for an item against a search query
  * @param {Object} item - The item to score
- * @param {string} query - The search query
+ * @param {string|Array} query - The search query or queries
  * @param {Array} fields - Array of field names to search in
+ * @param {boolean} strict - Whether to use strict matching (exact or starts-with only)
  * @returns {number} - Relevance score (higher is better)
  */
-export function calculateRelevanceScore(item, query, fields) {
+export function calculateRelevanceScore(item, query, fields, strict = false) {
   if (!query || !fields || fields.length === 0) return 0
   
-  const queryLower = query.toLowerCase()
-  let maxScore = 0
-  
-  for (const field of fields) {
-    const fieldValue = item[field]
-    if (!fieldValue) continue
-    
-    const fieldValueLower = String(fieldValue).toLowerCase()
-    
-    // Exact match gets highest score
-    if (fieldValueLower === queryLower) {
-      return 1.0
-    }
-    
-    // Starts with query gets high score
-    if (fieldValueLower.startsWith(queryLower)) {
-      maxScore = Math.max(maxScore, 0.8)
-      continue
-    }
-    
-    // Contains query gets medium score
-    if (fieldValueLower.includes(queryLower)) {
-      maxScore = Math.max(maxScore, 0.6)
-      continue
-    }
-    
-    // Calculate fuzzy similarity
-    const sim = similarity(fieldValueLower, queryLower)
-    if (sim > 0.3) {
-      // Boost the similarity score for better differentiation
-      maxScore = Math.max(maxScore, sim * 0.8)
-    }
-  }
-  
-  return maxScore
+  // Use Fuse for individual item scoring by wrapping it in an array
+  // This is slightly less efficient than bulk search but keeps the API consistent
+  const results = sortByRelevance([item], query, fields, strict)
+  return results.length > 0 ? results[0]._relevance : 0
 }
 
 /**
  * Sort items by relevance to a query
  * @param {Array} items - Array of items to sort
- * @param {string} query - The search query
+ * @param {string|Array} query - The search query or queries
  * @param {Array} fields - Array of field names to search in
+ * @param {boolean} strict - Whether to use strict matching
  * @returns {Array} - Sorted array with relevance scores attached
  */
-export function sortByRelevance(items, query, fields) {
-  if (!query || !fields || fields.length === 0) {
-    return items.map(item => ({ ...item, _relevance: 0 }))
+export function sortByRelevance(items, query, fields, strict = false) {
+  if (!query || !items || items.length === 0 || !fields || fields.length === 0) {
+    return (items || []).map(item => ({ ...item, _relevance: 0 }))
   }
+
+  // Ensure query is a string and not empty
+  const queryStr = (Array.isArray(query) ? query.join(' ') : String(query || '')).trim()
+  if (!queryStr) {
+     return items.map(item => ({ ...item, _relevance: 0 }))
+  }
+
+  // Fuse.js options
+  const options = {
+    keys: fields,
+    includeScore: true,
+    threshold: strict ? 0.05 : 0.8, // Extremely lenient for initial candidate gathering
+    distance: 100,
+    ignoreLocation: true,
+    findAllMatches: false,
+    minMatchCharLength: 1,
+    useExtendedSearch: true
+  }
+
+  const fuse = new Fuse(items, options)
+  const fuseResults = fuse.search(queryStr)
+
+  // Split query into tokens for coverage scoring
+  const tokens = queryStr.toLowerCase().split(/\s+/).filter(t => t.length > 1)
   
-  return items
-    .map(item => ({
-      ...item,
-      _relevance: calculateRelevanceScore(item, query, fields)
-    }))
-    .sort((a, b) => {
-      // Sort by relevance (descending)
-      if (a._relevance !== b._relevance) {
-        return b._relevance - a._relevance
-      }
-      
-      // If same relevance, sort alphabetically
-      return String(fields[0] in a ? a[fields[0]] : '')
-        .localeCompare(String(fields[0] in b ? b[fields[0]] : ''))
-    })
+  // Map results and apply Token Coverage Boost
+  const matchedItems = fuseResults.slice(0, 1000).map(result => {
+    let relevance = 1 - result.score
+    
+    if (tokens.length > 1 && !strict) {
+        // Boost relevance if it matches multiple tokens
+        const itemText = fields.map(f => {
+            const fieldName = typeof f === 'object' ? f.name : f
+            return String(result.item[fieldName] || '').toLowerCase()
+        }).join(' ')
+        
+        let tokenMatches = 0
+        tokens.forEach(token => {
+            if (itemText.includes(token)) {
+                tokenMatches += 1
+            } else {
+                // Check for close fuzzy match for this token specifically
+                // This is a partial check to boost even if token has a typo
+                if (token.length > 3) {
+                    const subTokens = [
+                        token.substring(0, Math.floor(token.length * 0.6)), // First halfish
+                        token.substring(1), // Shifted
+                        token.substring(0, token.length - 1) // Truncated
+                    ]
+                    if (subTokens.some(st => st.length >= 3 && itemText.includes(st))) {
+                        tokenMatches += 0.5
+                    }
+                }
+            }
+        })
+        
+        // Boost factor: matching 2/3 words is much better than matching 1/3
+        const coverageBoost = 1 + (tokenMatches / tokens.length)
+        relevance *= coverageBoost
+    }
+
+    return {
+      ...result.item,
+      _relevance: relevance
+    }
+  })
+
+  // Re-sort based on boosted relevance
+  matchedItems.sort((a, b) => b._relevance - a._relevance)
+
+  // Add items that didn't match with 0 relevance if needed, 
+  // but existing sortByRelevance filtered them out.
+  // SearchView expects only matches.
+
+  return matchedItems
 }
 
 /**
  * Filter items by exact match on a field
- * @param {Array} items - Array of items to filter
- * @param {string} field - Field name to match exactly
- * @param {string} value - Value to match
- * @returns {Array} - Filtered array
  */
 export function filterByExactMatch(items, field, value) {
   if (!field || !value) return items
@@ -153,9 +176,6 @@ export function filterByExactMatch(items, field, value) {
 
 /**
  * Sort items by date (newest first)
- * @param {Array} items - Array of items to sort
- * @param {string} dateField - Field name containing the date
- * @returns {Array} - Sorted array
  */
 export function sortByDateDesc(items, dateField = 'date') {
   return [...items].sort((a, b) => {

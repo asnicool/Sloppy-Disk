@@ -166,6 +166,7 @@
        :album-path="albumPath"
        :track-count="albumDetails?.trackCount"
        :duration="albumDetails?.duration"
+       :library-tracks="tracks"
        @close="showMetadataModal = false"
        @applied="handleMetadataApplied"
        @cover-updated="handleCoverUpdated"
@@ -347,16 +348,26 @@ const clearSelection = () => {
 }
 
 const getTargetTracks = () => {
+    // If tracks are selected, use them in selection order
     if (hasSelection.value) {
         return selectionOrder.value
+    }
+    // If no tracks selected, use all tracks in album order
+    if (!tracks.value || tracks.value.length === 0) {
+        console.warn('[AlbumDetailView] No tracks available')
+        return []
     }
     return tracks.value.map(t => t.path)
 }
 
 const handleAction = async (mode) => {
     const tracksToAdd = getTargetTracks()
-    if (tracksToAdd.length === 0) return
-    
+
+    if (!tracksToAdd || tracksToAdd.length === 0) {
+        showNotification('No tracks to add', 'error')
+        return
+    }
+
     try {
         await mpdStore.addTracks(tracksToAdd, mode)
         // Feedback
@@ -365,7 +376,10 @@ const handleAction = async (mode) => {
         if (mode === 'play') {
              // Already playing
         }
-        clearSelection()
+        // Only clear selection if tracks were actually selected
+        if (hasSelection.value) {
+            clearSelection()
+        }
     } catch (error) {
         showNotification('Action failed: ' + error.message, 'error')
     }

@@ -1,8 +1,8 @@
 {
   "mpdHost": "192.168.1.90",
   "mpdPort": 6600,
-  "musicRoot": "/media/music/",
-  "coverArtRoot": "/media/Folder/",
+  "musicRoot": "/mnt/m8box/media/music/",
+  "coverArtRoot": "/mnt/m8box/media/Folder/",
   "coverArtBaseUrl": "https://m8box.local/folder/",
   "discogsKey": "secretkey",
   "discogsSecret": "verysecretsecret",

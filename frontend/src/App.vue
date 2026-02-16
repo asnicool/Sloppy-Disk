@@ -15,7 +15,7 @@
                 <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
               </svg>
             </router-link>
-            <router-link to="/genres" class="p-2 text-neutral-400 hover:text-white transition-colors" title="Genres">
+            <router-link to="/genreXdate" class="p-2 text-neutral-400 hover:text-white transition-colors" title="Genre × Date Matrix">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
               </svg>
@@ -39,7 +39,45 @@
             </router-link>
           </div>
           
-          <div class="flex items-center">
+          <div class="flex items-center space-x-3">
+            <!-- Volume Control (Small screens only) -->
+            <div v-if="volumeSupported" class="relative group md:hidden">
+              <button
+                @click="showVolumeSlider = !showVolumeSlider"
+                class="p-2 rounded-lg hover:bg-neutral-700 transition-colors"
+                :class="showVolumeSlider ? 'text-blue-500' : 'text-neutral-400'"
+                title="Volume"
+              >
+                <svg v-if="volume === 0" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.804L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.797-3.804a1 1 0 011.617.804z" clip-rule="evenodd" />
+                </svg>
+                <svg v-else-if="volume < 50" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.804L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.797-3.804a1 1 0 011.617.804zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+                <svg v-else class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.804L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.797-3.804a1 1 0 011.617.804zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clip-rule="evenodd" />
+                </svg>
+              </button>
+
+              <!-- Volume Slider Popup -->
+              <div
+                v-if="showVolumeSlider"
+                class="absolute bottom-full right-0 mb-3 bg-neutral-800 border border-neutral-700 rounded-xl p-3 shadow-2xl w-10 flex flex-col items-center h-40"
+              >
+                <div class="flex-1 w-full flex flex-col items-center py-1">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    :value="volume"
+                    @input="setVolume($event.target.value)"
+                    class="vertical-slider h-full cursor-pointer appearance-none bg-neutral-700 rounded-full w-2"
+                  >
+                </div>
+                <span class="text-[10px] text-neutral-400 mt-2 font-mono">{{ volume }}</span>
+              </div>
+            </div>
+
             <!-- Connection Status -->
             <div class="flex items-center space-x-2" :title="isConnected ? 'Connected' : 'Disconnected'">
               <div
@@ -80,13 +118,22 @@ import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 const mpdStore = useMpdStore()
 const route = useRoute()
 const router = useRouter()
+const showVolumeSlider = ref(false)
+
 const isConnected = computed(() => mpdStore.isConnected)
 const currentSong = computed(() => mpdStore.status?.currentSong)
+const volume = computed(() => mpdStore.status?.volume ?? 0)
+const volumeSupported = computed(() => 'volume' in (mpdStore.status ?? {}))
+
 const showPlayerControls = computed(() => {
-  return currentSong.value && 
-         route.name !== 'nowplaying' && 
+  return currentSong.value &&
+         route.name !== 'nowplaying' &&
          route.name !== 'queue'
 })
+
+const setVolume = (v) => {
+  mpdStore.setVolume(parseInt(v))
+}
 
 // Keyboard shortcuts
 useKeyboardShortcuts({
@@ -192,5 +239,24 @@ button, .clickable {
 .page-leave-to {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+/* Volume slider styles */
+.vertical-slider {
+  writing-mode: bt-lr;
+  -webkit-appearance: slider-vertical;
+  width: 8px;
+  height: 100%;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 12px;
+  width: 12px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: 2px solid #3b82f6;
+  margin-top: 0;
 }
 </style>

@@ -203,7 +203,7 @@ func HandleAlbumDetails(w http.ResponseWriter, r *http.Request) {
 		return execErr
 	})
 
-	if err != nil {
+if err != nil {
 		SendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

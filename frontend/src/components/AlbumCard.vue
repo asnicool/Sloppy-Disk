@@ -202,7 +202,7 @@ const filterBy = (type, value) => {
   // Navigate to search with the filter query and type
   router.push({ 
     name: 'search', 
-    query: { q: value, type: type } 
+    query: { q: value, type: type, strict: 'true' } 
   })
 }
 
@@ -267,31 +267,55 @@ const checkFolderExists = (url) => {
         })
 }
 
-// Resolve the best image source - load /folder first immediately, check later
+// Resolve image immediately from props (fast path - no API call needed)
+const resolveImageFromProps = () => {
+    if (props.coverUrl) {
+        console.log('[AlbumCard] Using props.coverUrl immediately:', props.coverUrl)
+        currentImageSrc.value = props.coverUrl
+        usingFolderUrl.value = false
+        folderUrlChecked.value = true
+        return true
+    }
+    return false
+}
+
+// Resolve the best image source - try props first (fast), then fullDetails (slow)
 const resolveImageSource = () => {
-    // 1. Get the path to use (prefer track path, fall back to album path)
-    const path = fullDetails.value?.tracks?.length > 0 
-        ? fullDetails.value.tracks[0].path 
-        : fullDetails.value?.album?.path
-    
-    if (!path) {
-        fallbackToApi()
+    // 1. Try using props.coverUrl first (fastest - no API needed)
+    if (resolveImageFromProps()) {
         return
     }
-    
+
+    // 2. Fall back to folder URL from fullDetails (requires API call)
+    const path = fullDetails.value?.tracks?.length > 0
+        ? fullDetails.value.tracks[0].path
+        : fullDetails.value?.album?.path
+
+    if (!path) {
+        // No path available yet, try API coverUrl as fallback
+        const fallbackUrl = fullDetails.value?.album?.coverUrl || ''
+        if (fallbackUrl) {
+            console.log('[AlbumCard] Using fullDetails coverUrl as fallback:', fallbackUrl)
+            currentImageSrc.value = fallbackUrl
+            usingFolderUrl.value = false
+            folderUrlChecked.value = true
+        }
+        return
+    }
+
     const folderUrl = buildFolderUrl(path)
     if (!folderUrl) {
         fallbackToApi()
         return
     }
-    
-    // 2. Use /folder URL immediately (browser will cache it if it loads fast)
+
+    // 3. Use /folder URL immediately (browser will cache it if it loads fast)
     console.log('[AlbumCard] Using folder URL:', folderUrl)
     currentImageSrc.value = folderUrl
     usingFolderUrl.value = true
     folderUrlChecked.value = false
-    
-    // 3. In background, check if it returns 404
+
+    // 4. In background, check if it returns 404
     checkFolderExists(folderUrl)
 }
 
@@ -346,6 +370,12 @@ watch(() => mpdStore.config, () => {
 let observer = null
 
 const fetchDetails = async () => {
+  // If album is missing or "undefined", we can't fetch details.
+  // We allow artist to be empty as per user feedback ("normal" to have empty fields).
+  if (!props.album || props.album === 'undefined' || props.album === '') {
+      return
+  }
+
   // If we already have enriched data (trackCount > 0), DO NOT FETCH.
   if (fullDetails.value?.album?.trackCount > 0) {
       return
@@ -436,10 +466,14 @@ const handleCacheUpdate = (event) => {
 }
 
 onMounted(() => {
+  // IMPORTANT: Resolve image source immediately with props (fast path)
+  // This shows cover art right away without waiting for fetchDetails API call
+  resolveImageSource()
+
   observer = new IntersectionObserver((entries) => {
     if (entries[0].isIntersecting) {
       isVisible.value = true
-      fetchDetails()
+      fetchDetails() // Only fetches trackCount/duration now, doesn't block image
       // Once visible and fetching started, we can stop observing if we don't care about visibility anymore
       // or keep it if we want to pause/resume. For lazy load, one-time is enough.
       observer.disconnect()
@@ -449,7 +483,7 @@ onMounted(() => {
   if (cardRef.value) {
     observer.observe(cardRef.value)
   }
-  
+
   // Listen for cache update events
   window.addEventListener('album-cache-updated', handleCacheUpdate)
 })

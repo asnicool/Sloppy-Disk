@@ -790,8 +790,11 @@ func (c *Connection) parsePlaylistResponse(response string) ([]models.PlaylistIt
 				currentItem.Date = value
 			case "Genre":
 				currentItem.Genre = value
-			case "Duration":
-				currentItem.Duration = parseInt(value)
+			case "duration", "Time", "Duration":
+				// duration is often float in MPD, Time is integer seconds
+				var d float64
+				fmt.Sscanf(value, "%f", &d)
+				currentItem.Duration = int(d)
 			case "Pos":
 				currentItem.Pos = parseInt(value)
 			}
