@@ -122,6 +122,7 @@
           <tr 
             v-for="(track, index) in tracks" 
             :key="track.path" 
+            :data-track-path="track.path"
             @click="toggleSelection(track)"
             class="transition-colors group cursor-pointer"
             :class="[
@@ -260,7 +261,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
 import BaseToast from '@/components/BaseToast.vue'
@@ -421,6 +422,9 @@ const fetchAlbumDetails = async () => {
     if (tracks.value.length > 0) {
       const firstTrack = tracks.value[0]
       albumPath.value = firstTrack.path.split('/').slice(0, -1).join('/')
+
+      // Check for pre-selection from query parameter
+      handlePreSelection()
     }
   } catch (error) {
     console.error('[AlbumDetailView] Error fetching album details:', error)
@@ -429,6 +433,31 @@ const fetchAlbumDetails = async () => {
     console.log('[AlbumDetailView] Loading complete, albumDetails:', albumDetails.value)
   }
 }
+
+const handlePreSelection = () => {
+    const selectPath = route.query.selectPath
+    if (selectPath && tracks.value.length > 0) {
+        console.log('[AlbumDetailView] Handling pre-selection for:', selectPath)
+        const track = tracks.value.find(t => t.path === selectPath)
+        if (track) {
+            // Already selected?
+            if (!selectedTracks.value.has(track.path)) {
+                toggleSelection(track)
+            }
+            // Scroll to track after a short delay for DOM update
+            setTimeout(() => {
+                const element = document.querySelector(`[data-track-path="${CSS.escape(track.path)}"]`)
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }
+            }, 500)
+        }
+    }
+}
+
+watch(() => route.query.selectPath, () => {
+    handlePreSelection()
+})
 
 const searchMetadata = async () => {
   showMetadataModal.value = true

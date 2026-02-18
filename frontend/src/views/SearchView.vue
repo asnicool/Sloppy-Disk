@@ -196,29 +196,82 @@
       <!-- Songs (from MPD search) -->
       <section v-if="shouldShowSection('songs') && sortedSongs.length" class="space-y-4">
         <div class="flex items-center justify-between border-b border-neutral-800 pb-2">
-            <h2 class="text-xl font-bold text-primary-400 flex items-center">
-            <span class="mr-2">Songs</span>
-            <span class="px-2 py-0.5 bg-neutral-800 text-xs rounded-full text-neutral-400">{{ sortedSongs.length }}</span>
-            </h2>
-             <div v-if="isSearching" class="animate-spin h-5 w-5 border-2 border-primary-500 border-t-transparent rounded-full"></div>
+            <div class="flex items-center space-x-4">
+                <h2 class="text-xl font-bold text-primary-400 flex items-center">
+                    <span class="mr-2">Songs</span>
+                    <span class="px-2 py-0.5 bg-neutral-800 text-xs rounded-full text-neutral-400">{{ sortedSongs.length }}</span>
+                </h2>
+                <!-- Selection Actions -->
+                <div v-if="hasSelection" class="flex items-center space-x-2 animate-fadeIn">
+                    <button 
+                        @click="handleAction('play')"
+                        class="p-1.5 rounded-full bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition-all shadow-lg shadow-blue-900/20"
+                        title="Replace queue and play"
+                    >
+                        <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-1.664a1 1 0 000-1.664l-3-1.664z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <button 
+                        @click="handleAction('next')"
+                        class="p-1.5 rounded-full bg-neutral-700/50 text-neutral-300 hover:bg-neutral-600 hover:text-white transition-all"
+                        title="Play next"
+                    >
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                    <button 
+                        @click="handleAction('append')"
+                        class="p-1.5 rounded-full bg-neutral-700/50 text-neutral-300 hover:bg-neutral-600 hover:text-white transition-all"
+                        title="Add to queue"
+                    >
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </button>
+                    <button @click="clearSelection" class="text-xs text-neutral-500 hover:text-neutral-300 ml-2">Clear</button>
+                </div>
+            </div>
+            <div v-if="isSearching" class="animate-spin h-5 w-5 border-2 border-primary-500 border-t-transparent rounded-full"></div>
         </div>
         
         <div class="bg-neutral-800/30 rounded-xl overflow-hidden border border-neutral-800">
           <div 
             v-for="(song, idx) in sortedSongs.slice(0, displayLimitSongs)" 
             :key="song.path + idx"
-            @click="playSong(song)"
+            @click="toggleSelection(song)"
+            v-long-press="() => handleSongLongClick(song)"
             class="flex items-center px-4 py-3 hover:bg-neutral-700/40 cursor-pointer transition-colors border-b border-neutral-800/50 last:border-0 group"
+            :class="[
+                isTrackSelected(song) ? 'bg-blue-900/30 hover:bg-blue-900/40' : 'hover:bg-neutral-700/40',
+                hasSelection && !isTrackSelected(song) ? 'text-neutral-500 opacity-60' : ''
+            ]"
           >
-            <div class="w-8 text-neutral-500 text-xs text-center group-hover:hidden">{{ idx + 1 }}</div>
-            <div class="w-8 hidden group-hover:flex items-center justify-center text-primary-400">
-              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-              </svg>
+            <div class="w-10 flex items-center justify-center shrink-0">
+                <div class="relative w-6 h-6 flex items-center justify-center">
+                    <span 
+                        class="text-xs text-neutral-500 transition-opacity duration-200"
+                        :class="[
+                            hasSelection && !isTrackSelected(song) ? 'opacity-30' : 'opacity-100',
+                            isTrackSelected(song) ? 'opacity-0' : 'opacity-100'
+                        ]"
+                    >
+                        {{ idx + 1 }}
+                    </span>
+                    <!-- Selection Badge -->
+                    <div 
+                        v-if="isTrackSelected(song)" 
+                        class="absolute inset-0 bg-blue-500 rounded-full flex items-center justify-center text-[10px] text-white font-bold shadow-sm transition-opacity duration-200"
+                    >
+                        {{ getSelectionOrder(song) }}
+                    </div>
+                </div>
             </div>
+            
             <div class="flex-1 min-w-0 ml-2">
-              <p class="text-sm font-medium text-neutral-200 truncate">{{ song.title || 'Unknown Title' }}</p>
-              <p class="text-xs text-neutral-500 truncate">{{ song.artist }} • {{ song.album }}</p>
+              <p class="text-sm font-medium text-neutral-200 truncate" :class="{ 'text-white': isTrackSelected(song) }">{{ song.title || 'Unknown Title' }}</p>
+              <p class="text-xs text-neutral-500 truncate" :class="{ 'text-neutral-400': isTrackSelected(song) }">{{ song.artist }} • {{ song.album }}</p>
             </div>
             <div v-if="song._relevance && song._relevance < 1" class="text-xs text-neutral-600">
               {{ Math.round(song._relevance * 100) }}%
@@ -347,6 +400,56 @@ const showHistory = ref(false)
 const searchHistory = ref([]) // Array of arrays (chip sets)
 const isFromUrlLink = ref(false) // Track if search came from URL parameters
 const chipFieldTypes = ref({}) // Track which field each chip represents: { chipText: 'genre'|'date'|'artist'|'album' }
+
+// Selection State
+const selectedTracks = ref(new Set())
+const selectionOrder = ref([])
+
+const hasSelection = computed(() => selectedTracks.value.size > 0)
+
+const isTrackSelected = (track) => selectedTracks.value.has(track.path)
+
+const getSelectionOrder = (track) => {
+    return selectionOrder.value.indexOf(track.path) + 1
+}
+
+const toggleSelection = (track) => {
+    if (selectedTracks.value.has(track.path)) {
+        selectedTracks.value.delete(track.path)
+        selectionOrder.value = selectionOrder.value.filter(path => path !== track.path)
+    } else {
+        selectedTracks.value.add(track.path)
+        selectionOrder.value.push(track.path)
+    }
+}
+
+const clearSelection = () => {
+    selectedTracks.value.clear()
+    selectionOrder.value = []
+}
+
+const getTargetTracks = () => {
+    if (hasSelection.value) {
+        return selectionOrder.value
+    }
+    return []
+}
+
+const handleAction = async (mode) => {
+    const tracksToAdd = getTargetTracks()
+
+    if (!tracksToAdd || tracksToAdd.length === 0) {
+        // Fallback to single track if nothing selected (though UI should prevent this now)
+        return
+    }
+
+    try {
+        await mpdStore.addTracks(tracksToAdd, mode)
+        clearSelection()
+    } catch (error) {
+        console.error('Action failed:', error)
+    }
+}
 
 const localAlbums = ref([])
 const localArtists = ref([])
@@ -770,8 +873,18 @@ const handleRouteQuery = () => {
 
 // --- Navigation ---
 
-const playSong = (song) => {
-  mpdStore.addToPlaylist(song.path)
+const handleSongLongClick = (song) => {
+    if (!song.artist || !song.album) return
+    router.push({
+        name: 'album-detail',
+        params: {
+            artist: song.artist,
+            album: song.album
+        },
+        query: {
+            selectPath: song.path
+        }
+    })
 }
 
 const navigateToArtist = (artist) => {
