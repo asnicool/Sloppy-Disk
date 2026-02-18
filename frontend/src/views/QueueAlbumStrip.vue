@@ -112,11 +112,12 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import draggable from 'vuedraggable'
 import { useMpdStore } from '@/stores/mpd'
 import { useDoubleTapSimple } from '@/composables/useDoubleTap'
 import QueueTrackList from '@/components/QueueTrackList.vue'
+import { debounce } from 'lodash-es'
 
 const mpdStore = useMpdStore()
 const isCompact = ref(false)
@@ -135,6 +136,43 @@ const getAlbumCoverHandlers = (group) => {
   return doubleTapHandlers(() => playAlbumFromStart(group))
 }
 
+// Debounced function to calculate dot sizes
+const calculateDotSizes = debounce((tracks) => {
+  if (!tracks || tracks.length === 0) return
+  
+  // Calculate duration ranges for the album
+  const durations = tracks.map(t => t.duration || 0).filter(d => d > 0)
+  if (durations.length === 0) return
+  
+  const minDuration = Math.min(...durations)
+  const maxDuration = Math.max(...durations)
+  const durationRange = maxDuration - minDuration
+  
+  // Calculate size for each track based on duration
+  tracks.forEach(track => {
+    if (track.duration && durationRange > 60) { // Only calculate if range > 1 minute
+      const relativePosition = (track.duration - minDuration) / durationRange
+      if (relativePosition > 0.66) {
+        track.dotSize = 'large'
+      } else if (relativePosition > 0.33) {
+        track.dotSize = 'medium'
+      } else {
+        track.dotSize = 'small'
+      }
+    } else {
+      // Fallback to absolute duration thresholds
+      const minutes = (track.duration || 0) / 60
+      if (minutes >= 10) {
+        track.dotSize = 'large'
+      } else if (minutes >= 5) {
+        track.dotSize = 'medium'
+      } else {
+        track.dotSize = 'small'
+      }
+    }
+  })
+}, 100) // Debounce by 100ms
+
 const groupedPlaylist = computed({
   get() {
     const playlist = mpdStore.playlist
@@ -149,7 +187,11 @@ const groupedPlaylist = computed({
       const isCurrentTrack = index === currentPos
       
       if (!currentGroup || currentGroup.key !== key) {
-        if (currentGroup) groups.push(currentGroup)
+        if (currentGroup) {
+          // Calculate dot sizes for the previous group
+          calculateDotSizes(currentGroup.tracks)
+          groups.push(currentGroup)
+        }
         
         let coverUrl = null
         const dir = track.path.substring(0, track.path.lastIndexOf('/'))
@@ -166,7 +208,8 @@ const groupedPlaylist = computed({
           startPos: index,
           tracks: [],
           isPlayed: index < currentPos,
-          hasCurrentTrack: false
+          hasCurrentTrack: false,
+          totalDuration: 0
         }
       }
       
@@ -174,14 +217,23 @@ const groupedPlaylist = computed({
         currentGroup.hasCurrentTrack = true
       }
       
-      currentGroup.tracks.push({
+      const trackWithDuration = {
         ...track,
         isCurrentTrack,
-        isPlayed: index < currentPos
-      })
+        isPlayed: index < currentPos,
+        duration: track.duration || 0,
+        dotSize: 'small' // Default size
+      }
+      
+      currentGroup.tracks.push(trackWithDuration)
+      currentGroup.totalDuration += track.duration || 0
     })
     
-    if (currentGroup) groups.push(currentGroup)
+    if (currentGroup) {
+      // Calculate dot sizes for the last group
+      calculateDotSizes(currentGroup.tracks)
+      groups.push(currentGroup)
+    }
     return groups
   },
   set(newGroups) {

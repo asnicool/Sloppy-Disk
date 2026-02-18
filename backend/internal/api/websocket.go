@@ -1,4 +1,4 @@
-xpackage api
+package api
 
 import (
 	"context"

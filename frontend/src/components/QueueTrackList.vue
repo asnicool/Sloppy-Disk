@@ -39,7 +39,7 @@
         <!-- Unplayed Indicator Dot -->
         <div 
           v-if="!element.isPlayed && !element.isCurrentTrack" 
-          class="w-1.5 h-1.5 rounded-full bg-neutral-600"
+          :class="getDotSizeClass(element.dotSize)"
           title="Not played yet"
         ></div>
       </div>
@@ -80,6 +80,16 @@ const getTrackClass = (element) => {
     return 'bg-neutral-800/30 hover:bg-neutral-800/50'
   }
   return 'bg-neutral-800/50 hover:bg-neutral-700/80'
+}
+
+const getDotSizeClass = (size) => {
+  // Performance optimization: cache the class names
+  const sizeMap = {
+    small: 'dot-size-small',
+    medium: 'dot-size-medium',
+    large: 'dot-size-large'
+  }
+  return sizeMap[size] || 'dot-size-small'
 }
 
 const playTrack = (pos) => {
