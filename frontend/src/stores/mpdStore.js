@@ -95,10 +95,13 @@ export const useMpdStore = defineStore('mpd', () => {
       status.value = response.data.data
       isConnected.value = true
       console.log('[MPD] Status set:', status.value)
-      
+
       connectWebSocket()
       connectSearchWebSocket()
-      
+
+      // Setup visibility-based refresh (iOS Safari friendly)
+      setupVisibilityRefresh()
+
       // Load all albums for matrix (Phase 1)
       loadAllAlbums()
     } catch (error) {
@@ -820,15 +823,64 @@ export const useMpdStore = defineStore('mpd', () => {
      }
    }
 
+  // Visibility-based refresh (iOS Safari friendly)
+  const setupVisibilityRefresh = () => {
+    // Handle page becoming visible (tab switch, app return on iOS)
+    const handlePageVisible = async () => {
+      console.log('[MPD Store] Page became visible, refreshing data')
+
+      // Check WebSocket health and reconnect if needed
+      if (ws.value && ws.value.readyState !== WebSocket.OPEN) {
+        console.log('[MPD Store] WebSocket not open, reconnecting...')
+        connectWebSocket()
+      }
+
+      // Check search WebSocket health
+      if (searchWs.value && searchWs.value.readyState !== WebSocket.OPEN) {
+        console.log('[MPD Store] Search WebSocket not open, reconnecting...')
+        connectSearchWebSocket()
+      }
+
+      // Refresh status and playlist for fresh data
+      try {
+        await aggressiveRefresh()
+        console.log('[MPD Store] Visibility refresh complete')
+      } catch (error) {
+        console.error('[MPD Store] Visibility refresh failed:', error)
+      }
+    }
+
+    // Handle route changes
+    const handleRouteChange = async () => {
+      console.log('[MPD Store] Route changed, ensuring fresh data')
+      // Just verify WebSocket is alive, don't full refresh on every route change
+      // to avoid excessive API calls
+      if (ws.value && ws.value.readyState !== WebSocket.OPEN) {
+        console.log('[MPD Store] WebSocket disconnected on route change, reconnecting...')
+        connectWebSocket()
+      }
+    }
+
+    // Listen for visibility events
+    window.addEventListener('page-visible', handlePageVisible)
+    window.addEventListener('route-changed', handleRouteChange)
+
+    // Return cleanup function
+    return () => {
+      window.removeEventListener('page-visible', handlePageVisible)
+      window.removeEventListener('route-changed', handleRouteChange)
+    }
+  }
+
   // Polling for status updates (fallback for when WebSocket fails)
   const startPolling = () => {
     if (pollInterval.value) {
       console.log('[MPD Store] Polling already active, skipping')
       return
     }
-    
+
     console.log('[MPD Store] Starting status polling')
-    
+
     // Poll every 30 seconds as fallback
     pollInterval.value = setInterval(async () => {
       try {
@@ -947,7 +999,7 @@ export const useMpdStore = defineStore('mpd', () => {
     lastDatabaseUpdate,
     allAlbums,
     isLoadingAlbums,
-    
+
     // Getters
     currentSong,
     isPlaying,
@@ -956,7 +1008,7 @@ export const useMpdStore = defineStore('mpd', () => {
     volume,
     isN50Enabled,
     genreDateMatrix,
-    
+
     // Actions
     connect,
     disconnect,
@@ -1002,6 +1054,7 @@ export const useMpdStore = defineStore('mpd', () => {
     n50PowerOff,
     n50SetInput,
     fetchGenreDateMatrix,
-    loadAllAlbums
+    loadAllAlbums,
+    setupVisibilityRefresh
   }
 })

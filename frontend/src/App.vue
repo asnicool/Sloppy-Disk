@@ -109,11 +109,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
 import PlayerControls from '@/components/PlayerControls.vue'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { useVisibilityRefresh } from '@/composables/useVisibilityRefresh'
 
 const mpdStore = useMpdStore()
 const route = useRoute()
@@ -134,6 +135,12 @@ const showPlayerControls = computed(() => {
 const setVolume = (v) => {
   mpdStore.setVolume(parseInt(v))
 }
+
+// Setup visibility refresh for iOS Safari compatibility
+const { setup: setupVisibilityRefresh, cleanup: cleanupVisibilityRefresh } = useVisibilityRefresh({
+  debug: import.meta.env.DEV,
+  debounceMs: 500
+})
 
 // Keyboard shortcuts
 useKeyboardShortcuts({
@@ -182,6 +189,14 @@ useKeyboardShortcuts({
 onMounted(() => {
   // Initialize MPD connection
   mpdStore.connect()
+
+  // Setup visibility listeners for iOS Safari compatibility
+  setupVisibilityRefresh()
+})
+
+onUnmounted(() => {
+  // Cleanup visibility listeners
+  cleanupVisibilityRefresh()
 })
 </script>
 
