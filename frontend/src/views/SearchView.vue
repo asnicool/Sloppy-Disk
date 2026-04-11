@@ -574,7 +574,7 @@ const getCombinedTerms = () => {
   return terms
 }
 
-const triggerSearchRaw = () => {
+const triggerSearchRaw = async () => {
   const terms = getCombinedTerms()
   
   if (terms.length === 0) {
@@ -608,7 +608,7 @@ const triggerSearchRaw = () => {
   displayLimitSongs.value = 30
   
   // 1. Local Search (Albums, Artists, Genres, Dates)
-  const localResults = performLocalSearchRaw(terms)
+  const localResults = await performLocalSearchRaw(terms)
   localAlbums.value = localResults.albums
   localArtists.value = localResults.artists
   localGenres.value = localResults.genres
