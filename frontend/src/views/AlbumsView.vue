@@ -106,7 +106,23 @@ const hasMore = ref(false)
 const itemsPerPage = 36
 const sortMode = ref('random') // 'name', 'date', 'random'
 
+const getCacheKey = () => `${sortMode.value}-${currentPage.value}`
+
 const loadAlbums = async () => {
+  // Check cache first
+  const cacheKey = getCacheKey()
+  const cached = mpdStore.getAlbumListCache(cacheKey)
+  
+  if (cached) {
+    console.log('[AlbumsView] Using cached albums:', cacheKey)
+    albums.value = cached.albums
+    totalAlbums.value = cached.totalAlbums
+    totalPages.value = cached.totalPages
+    hasMore.value = cached.hasMore
+    loading.value = false
+    return
+  }
+
   loading.value = true
   try {
     if (sortMode.value === 'date' || sortMode.value === 'name') {
@@ -131,6 +147,14 @@ const loadAlbums = async () => {
         hasMore.value = false
       }
     }
+    
+    // Cache the results
+    mpdStore.setAlbumListCache(cacheKey, {
+      albums: albums.value,
+      totalAlbums: totalAlbums.value,
+      totalPages: totalPages.value,
+      hasMore: hasMore.value
+    })
   } finally {
     loading.value = false
   }

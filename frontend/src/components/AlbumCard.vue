@@ -89,10 +89,10 @@
     <div 
       class="p-4 flex-1 flex flex-col"
     >
-      <div class="flex-1 min-w-0">
+      <div class="flex-1 min-w-0 flex flex-col space-y-2">
         <h3 class="text-sm font-bold text-gray-100 truncate group-hover:text-primary-400 transition-colors" :title="album">{{ album }}</h3>
         <p 
-          class="text-xs text-gray-400 truncate mt-0.5 hover:text-primary-400 cursor-pointer transition-colors"
+          class="text-xs text-gray-400 truncate hover:text-primary-400 cursor-pointer transition-colors"
           @click.stop="filterBy('artist', artist)"
         >
           {{ artist }}
@@ -100,7 +100,7 @@
       </div>
 
       <!-- Immediate Metadata (from props) -->
-      <div v-if="date || genre" class="flex flex-wrap items-center gap-2">
+      <div v-if="date || genre" class="mt-2 flex flex-wrap items-center gap-2">
         <span
           v-if="date"
           class="px-2 py-0.5 bg-neutral-700/50 text-[10px] text-neutral-300 rounded-md border border-neutral-600/30 hover:bg-neutral-600 cursor-pointer transition-colors"

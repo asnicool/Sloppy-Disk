@@ -528,6 +528,8 @@ func HandlePlaylistAlbum(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[Playlist] HandlePlaylistAlbum called with mode: %s, artist: %s, album: %s", req.Mode, req.Artist, req.Album)
+
 	// Fetch tracks for the album
 	albumEsc := strings.ReplaceAll(req.Album, "\"", "\\\"")
 	artistEsc := strings.ReplaceAll(req.Artist, "\"", "\\\"")
@@ -556,39 +558,48 @@ func HandlePlaylistAlbum(w http.ResponseWriter, r *http.Request) {
 
 	// Perform playlist operation
 	switch req.Mode {
-	case "replace":
+	case "play", "replace":
 		commands := []string{"clear"}
 		for _, s := range songs {
 			commands = append(commands, fmt.Sprintf("add \"%s\"", strings.ReplaceAll(s.Path, "\"", "\\\"")))
 		}
 		commands = append(commands, "play")
-		client.SendCommandList(commands)
-	case "insert":
-		err := client.Execute(func(conn *mpd.Connection) error {
-			status, err := conn.GetStatus()
-			if err != nil {
-				return err
-			}
-			pos := status.PlaylistPos + 1
-			commands := make([]string, len(songs))
-			for i, s := range songs {
-				commands[i] = fmt.Sprintf("addid \"%s\" %d", strings.ReplaceAll(s.Path, "\"", "\\\""), pos+i)
-			}
-			_, err = conn.SendCommandList(commands)
-			return err
-		})
+		_, err = client.SendCommandList(commands)
+		if err != nil {
+			SendError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	case "next", "insert":
+		commands := []string{}
+		for _, s := range songs {
+			commands = append(commands, fmt.Sprintf("add \"%s\"", strings.ReplaceAll(s.Path, "\"", "\\\"")))
+		}
+		// Get current playlist position
+		status, err := client.GetStatus()
+		if err != nil {
+			SendError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		pos := status.PlaylistPos + 1
+		// Move each added track to the correct position
+		for i := 0; i < len(songs); i++ {
+			commands = append(commands, fmt.Sprintf("move %d %d", len(songs) + i, pos + i))
+		}
+		_, err = client.SendCommandList(commands)
 		if err != nil {
 			SendError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 	case "append":
-		fallthrough
-	default:
 		commands := make([]string, len(songs))
 		for i, s := range songs {
 			commands[i] = fmt.Sprintf("add \"%s\"", strings.ReplaceAll(s.Path, "\"", "\\\""))
 		}
-		client.SendCommandList(commands)
+		_, err = client.SendCommandList(commands)
+		if err != nil {
+			SendError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 
 	SendJSON(w, models.APIResponse{Success: true})

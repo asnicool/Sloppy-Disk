@@ -203,33 +203,24 @@
                 </h2>
                 <!-- Selection Actions -->
                 <div v-if="hasSelection" class="flex items-center space-x-2 animate-fadeIn">
-                    <button 
+                    <button
                         @click="handleAction('play')"
                         class="p-1.5 rounded-full bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition-all shadow-lg shadow-blue-900/20"
                         title="Replace queue and play"
-                    >
-                        <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-1.664a1 1 0 000-1.664l-3-1.664z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                    <button 
+                        v-html="QueueActionIcons.play"
+                    ></button>
+                    <button
                         @click="handleAction('next')"
                         class="p-1.5 rounded-full bg-neutral-700/50 text-neutral-300 hover:bg-neutral-600 hover:text-white transition-all"
                         title="Play next"
-                    >
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                    <button 
+                        v-html="QueueActionIcons.next"
+                    ></button>
+                    <button
                         @click="handleAction('append')"
                         class="p-1.5 rounded-full bg-neutral-700/50 text-neutral-300 hover:bg-neutral-600 hover:text-white transition-all"
                         title="Add to queue"
-                    >
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </button>
+                        v-html="QueueActionIcons.append"
+                    ></button>
                     <button @click="clearSelection" class="text-xs text-neutral-500 hover:text-neutral-300 ml-2">Clear</button>
                 </div>
             </div>
@@ -358,6 +349,7 @@ import { albumList } from '@/services/albumList'
 import { debounce } from 'lodash-es'
 import AlbumCard from '@/components/AlbumCard.vue'
 import { sortByRelevance, sortByDateDesc, filterByExactMatch } from '@/utils/fuzzyMatch'
+import { useQueueActions, QueueActionIcons } from '@/composables/useQueueActions'
 
 // Simple directive for long press
 const vLongPress = {
@@ -392,6 +384,17 @@ const route = useRoute()
 const mpdStore = useMpdStore()
 const searchInput = ref(null)
 
+// Use shared queue actions composable for selection management
+const {
+  hasSelection,
+  isTrackSelected,
+  getSelectionOrder,
+  toggleSelection,
+  clearSelection,
+  getTargetTracks,
+  handleAction: handleQueueAction
+} = useQueueActions()
+
 const query = ref('')
 const searchChips = ref([])
 const activeCategory = ref('')
@@ -401,51 +404,15 @@ const searchHistory = ref([]) // Array of arrays (chip sets)
 const isFromUrlLink = ref(false) // Track if search came from URL parameters
 const chipFieldTypes = ref({}) // Track which field each chip represents: { chipText: 'genre'|'date'|'artist'|'album' }
 
-// Selection State
-const selectedTracks = ref(new Set())
-const selectionOrder = ref([])
-
-const hasSelection = computed(() => selectedTracks.value.size > 0)
-
-const isTrackSelected = (track) => selectedTracks.value.has(track.path)
-
-const getSelectionOrder = (track) => {
-    return selectionOrder.value.indexOf(track.path) + 1
-}
-
-const toggleSelection = (track) => {
-    if (selectedTracks.value.has(track.path)) {
-        selectedTracks.value.delete(track.path)
-        selectionOrder.value = selectionOrder.value.filter(path => path !== track.path)
-    } else {
-        selectedTracks.value.add(track.path)
-        selectionOrder.value.push(track.path)
-    }
-}
-
-const clearSelection = () => {
-    selectedTracks.value.clear()
-    selectionOrder.value = []
-}
-
-const getTargetTracks = () => {
-    if (hasSelection.value) {
-        return selectionOrder.value
-    }
-    return []
+const getSearchCacheKey = () => {
+  const chips = searchChips.value.join('|')
+  const q = query.value
+  return `${chips}|${q}|${isStrict.value}|${activeCategory.value}`
 }
 
 const handleAction = async (mode) => {
-    const tracksToAdd = getTargetTracks()
-
-    if (!tracksToAdd || tracksToAdd.length === 0) {
-        // Fallback to single track if nothing selected (though UI should prevent this now)
-        return
-    }
-
     try {
-        await mpdStore.addTracks(tracksToAdd, mode)
-        clearSelection()
+        await handleQueueAction(mode)
     } catch (error) {
         console.error('Action failed:', error)
     }
@@ -619,21 +586,50 @@ const triggerSearchRaw = () => {
     return
   }
 
+  // Check cache first
+  const cacheKey = getSearchCacheKey()
+  const cached = mpdStore.getSearchCache(cacheKey)
+  
+  if (cached) {
+    console.log('[SearchView] Using cached search results:', cacheKey)
+    localAlbums.value = cached.localAlbums
+    localArtists.value = cached.localArtists
+    localGenres.value = cached.localGenres
+    localDates.value = cached.localDates
+    if (cached.songs) {
+      mpdStore.setSearchResults({ songs: cached.songs })
+    }
+    return
+  }
+
   // Reset display limits on new search
   displayLimitArtists.value = 30
   displayLimitAlbums.value = 30
   displayLimitSongs.value = 30
   
   // 1. Local Search (Albums, Artists, Genres, Dates)
-  performLocalSearch(terms)
+  const localResults = performLocalSearchRaw(terms)
+  localAlbums.value = localResults.albums
+  localArtists.value = localResults.artists
+  localGenres.value = localResults.genres
+  localDates.value = localResults.dates
   
   // 2. MPD Search (Songs)
   performMpdSearch(terms.join(' '))
+
+  // Cache the local results
+  mpdStore.setSearchCache(cacheKey, {
+    localAlbums: localResults.albums,
+    localArtists: localResults.artists,
+    localGenres: localResults.genres,
+    localDates: localResults.dates,
+    songs: mpdStore.searchResults?.songs || []
+  })
 }
 
 const triggerSearch = debounce(triggerSearchRaw, 300)
 
-const performLocalSearch = async (terms) => {
+const performLocalSearchRaw = async (terms) => {
   if (!albumList.isLoaded()) {
     console.log('[Search] albumList not loaded, attempting load...')
     await albumList.loadAlbums()
@@ -695,36 +691,28 @@ const performLocalSearch = async (terms) => {
     // In strict mode, the manual filter above already did all the work
     // No need to run Fuse.js which would join terms and fail to match multi-field criteria
 
-    // Sort by artist, then date, then genre when coming from URL link parameters (genre=, date=, etc.)
-    if (isFromUrlLink.value) {
-      results.sort((a, b) => {
-        // Primary: Artist name (alphabetical)
-        const artistA = String(a.artist || '').toLowerCase()
-        const artistB = String(b.artist || '').toLowerCase()
-        if (artistA !== artistB) {
-          return artistA.localeCompare(artistB)
+    // Sort strict mode results by date (ascending), then artist
+    // This applies to ALL strict searches (manual entry, checkbox toggle, AND URL links)
+    results.sort((a, b) => {
+      // Primary: Date (oldest first - ascending)
+      const dateA = a.date || ''
+      const dateB = b.date || ''
+      if (dateA !== dateB) {
+        // Extract year for comparison
+        const yearA = parseInt(dateA.substring(0, 4)) || 0
+        const yearB = parseInt(dateB.substring(0, 4)) || 0
+        if (yearA !== yearB) {
+          return yearA - yearB // Oldest first (ascending)
         }
+        return dateA.localeCompare(dateB) // Full date comparison if same year (ascending)
+      }
 
-        // Secondary: Date (newest first)
-        const dateA = a.date || ''
-        const dateB = b.date || ''
-        if (dateA !== dateB) {
-          // Extract year for comparison
-          const yearA = parseInt(dateA.substring(0, 4)) || 0
-          const yearB = parseInt(dateB.substring(0, 4)) || 0
-          if (yearA !== yearB) {
-            return yearB - yearA // Newest first
-          }
-          return dateB.localeCompare(dateA) // Full date comparison if same year
-        }
-
-        // Tertiary: Genre (alphabetical)
-        const genreA = String(a.genre || '').toLowerCase()
-        const genreB = String(b.genre || '').toLowerCase()
-        return genreA.localeCompare(genreB)
-      })
-      console.log(`[Search] URL link strict mode: sorted ${results.length} albums by artist → date → genre`)
-    }
+      // Secondary: Artist name (alphabetical)
+      const artistA = String(a.artist || '').toLowerCase()
+      const artistB = String(b.artist || '').toLowerCase()
+      return artistA.localeCompare(artistB)
+    })
+    console.log(`[Search] Strict mode: sorted ${results.length} albums by date (asc) → artist`)
   } else {
     // Fuzzy mode: Use Fuse.js for relevance scoring and ranking
     const weightedFields = [
@@ -756,13 +744,14 @@ const performLocalSearch = async (terms) => {
   let artists = Array.from(artistSet).map(a => ({ name: a }))
   if (artists.length > 0) {
     artists = sortByRelevance(artists, terms, ['name'], isStrict.value)
-    localArtists.value = artists.map(a => a.name)
-  } else {
-    localArtists.value = []
   }
   
-  localGenres.value = Array.from(genreSet).sort()
-  localDates.value = Array.from(dateSet).sort((a, b) => b.localeCompare(a))
+  return {
+    albums: results,
+    artists: artists.map(a => a.name),
+    genres: Array.from(genreSet).sort(),
+    dates: Array.from(dateSet).sort((a, b) => b.localeCompare(a))
+  }
 }
 
 const performMpdSearch = (searchString) => {

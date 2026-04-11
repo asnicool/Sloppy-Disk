@@ -1,0 +1,91 @@
+ [4m[38;2;52;211;153minfo[0m [2m[3m[38;2;100;116;139mcli[0m [2m[38;2;148;163;184m🔍 Searching for Claude CLI in PATH...[0m
+ [4m[38;2;52;211;153minfo[0m [2m[3m[38;2;100;116;139mcli[0m [2m[38;2;148;163;184m🔍 Detecting actual Claude CLI script path...[0m
+ [4m[38;2;52;211;153minfo[0m [2m[3m[38;2;100;116;139mcli[0m [2m[38;2;148;163;184m✅ Claude CLI script detected:
+          /run/user/1000/fnm_multishells/2106778_1772277039646/bin/claude[0m
+ [4m[38;2;52;211;153minfo[0m [2m[3m[38;2;100;116;139mcli[0m [2m[38;2;148;163;184m✅ Claude CLI found: 2.1.25 (Claude Code)[0m
+ [4m[38;2;52;211;153minfo[0m [2m[3m[38;2;100;116;139mcli[0m [2m[38;2;148;163;184m🚀 Server starting on 192.168.1.111:8080[0m
+Listening on http://192.168.1.111:8080/
+ [4m[38;2;248;113;113merror[0m [2m[3m[38;2;100;116;139mchat[0m [2m[38;2;148;163;184mClaude Code execution failed: [0mAbortError: Claude Code process
+            aborted by user[2m[38;2;148;163;184m
+                at ChildProcess.<anonymous>
+            (file:///home/n/.local/share/fnm/node-versions/v22.14.0/installation/lib/node_modules/[4mclaude-code-webui[24m/node_modules/[4m@anthropic-ai[24m/claude-code/sdk.mjs:6481:28)[2m[38;2;148;163;184m
+            [90m    at ChildProcess.emit (node:events:518:28)[39m[2m[38;2;148;163;184m
+            [90m    at abortChildProcess (node:child_process:716:13)[39m[2m[38;2;148;163;184m
+            [90m    at AbortSignal.onAbortListener (node:child_process:786:7)[39m[2m[38;2;148;163;184m
+            [90m    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:827:20)[39m[2m[38;2;148;163;184m
+            [90m    at AbortSignal.dispatchEvent (node:internal/event_target:762:26)[39m[2m[38;2;148;163;184m
+            [90m    at runAbort (node:internal/abort_controller:447:10)[39m[2m[38;2;148;163;184m
+            [90m    at abortSignal (node:internal/abort_controller:433:3)[39m[2m[38;2;148;163;184m
+            [90m    at AbortController.abort (node:internal/abort_controller:466:5)[39m[2m[38;2;148;163;184m
+                at handleAbortRequest
+            (file:///home/n/.local/share/fnm/node-versions/v22.14.0/installation/lib/node_modules/[4mclaude-code-webui[24m/dist/cli/node.js:2266:21)[2m[38;2;148;163;184m[0m
+ [4m[38;2;248;113;113merror[0m [2m[3m[38;2;100;116;139mchat[0m [2m[38;2;148;163;184mClaude Code execution failed: [0mAbortError: Claude Code process
+            aborted by user[2m[38;2;148;163;184m
+                at ChildProcess.<anonymous>
+            (file:///home/n/.local/share/fnm/node-versions/v22.14.0/installation/lib/node_modules/[4mclaude-code-webui[24m/node_modules/[4m@anthropic-ai[24m/claude-code/sdk.mjs:6481:28)[2m[38;2;148;163;184m
+            [90m    at ChildProcess.emit (node:events:518:28)[39m[2m[38;2;148;163;184m
+            [90m    at abortChildProcess (node:child_process:716:13)[39m[2m[38;2;148;163;184m
+            [90m    at AbortSignal.onAbortListener (node:child_process:786:7)[39m[2m[38;2;148;163;184m
+            [90m    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:827:20)[39m[2m[38;2;148;163;184m
+            [90m    at AbortSignal.dispatchEvent (node:internal/event_target:762:26)[39m[2m[38;2;148;163;184m
+            [90m    at runAbort (node:internal/abort_controller:447:10)[39m[2m[38;2;148;163;184m
+            [90m    at abortSignal (node:internal/abort_controller:433:3)[39m[2m[38;2;148;163;184m
+            [90m    at AbortController.abort (node:internal/abort_controller:466:5)[39m[2m[38;2;148;163;184m
+                at handleAbortRequest
+            (file:///home/n/.local/share/fnm/node-versions/v22.14.0/installation/lib/node_modules/[4mclaude-code-webui[24m/dist/cli/node.js:2266:21)[2m[38;2;148;163;184m[0m
+ [4m[38;2;248;113;113merror[0m [2m[3m[38;2;100;116;139mchat[0m [2m[38;2;148;163;184mClaude Code execution failed: [0mAbortError: Claude Code process
+            aborted by user[2m[38;2;148;163;184m
+                at ChildProcess.<anonymous>
+            (file:///home/n/.local/share/fnm/node-versions/v22.14.0/installation/lib/node_modules/[4mclaude-code-webui[24m/node_modules/[4m@anthropic-ai[24m/claude-code/sdk.mjs:6481:28)[2m[38;2;148;163;184m
+            [90m    at ChildProcess.emit (node:events:518:28)[39m[2m[38;2;148;163;184m
+            [90m    at abortChildProcess (node:child_process:716:13)[39m[2m[38;2;148;163;184m
+            [90m    at AbortSignal.onAbortListener (node:child_process:786:7)[39m[2m[38;2;148;163;184m
+            [90m    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:827:20)[39m[2m[38;2;148;163;184m
+            [90m    at AbortSignal.dispatchEvent (node:internal/event_target:762:26)[39m[2m[38;2;148;163;184m
+            [90m    at runAbort (node:internal/abort_controller:447:10)[39m[2m[38;2;148;163;184m
+            [90m    at abortSignal (node:internal/abort_controller:433:3)[39m[2m[38;2;148;163;184m
+            [90m    at AbortController.abort (node:internal/abort_controller:466:5)[39m[2m[38;2;148;163;184m
+                at handleAbortRequest
+            (file:///home/n/.local/share/fnm/node-versions/v22.14.0/installation/lib/node_modules/[4mclaude-code-webui[24m/dist/cli/node.js:2266:21)[2m[38;2;148;163;184m[0m
+ [4m[38;2;248;113;113merror[0m [2m[3m[38;2;100;116;139mchat[0m [2m[38;2;148;163;184mClaude Code execution failed: [0mAbortError: Claude Code process
+            aborted by user[2m[38;2;148;163;184m
+                at ChildProcess.<anonymous>
+            (file:///home/n/.local/share/fnm/node-versions/v22.14.0/installation/lib/node_modules/[4mclaude-code-webui[24m/node_modules/[4m@anthropic-ai[24m/claude-code/sdk.mjs:6481:28)[2m[38;2;148;163;184m
+            [90m    at ChildProcess.emit (node:events:518:28)[39m[2m[38;2;148;163;184m
+            [90m    at abortChildProcess (node:child_process:716:13)[39m[2m[38;2;148;163;184m
+            [90m    at AbortSignal.onAbortListener (node:child_process:786:7)[39m[2m[38;2;148;163;184m
+            [90m    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:827:20)[39m[2m[38;2;148;163;184m
+            [90m    at AbortSignal.dispatchEvent (node:internal/event_target:762:26)[39m[2m[38;2;148;163;184m
+            [90m    at runAbort (node:internal/abort_controller:447:10)[39m[2m[38;2;148;163;184m
+            [90m    at abortSignal (node:internal/abort_controller:433:3)[39m[2m[38;2;148;163;184m
+            [90m    at AbortController.abort (node:internal/abort_controller:466:5)[39m[2m[38;2;148;163;184m
+                at handleAbortRequest
+            (file:///home/n/.local/share/fnm/node-versions/v22.14.0/installation/lib/node_modules/[4mclaude-code-webui[24m/dist/cli/node.js:2266:21)[2m[38;2;148;163;184m[0m
+ [4m[38;2;248;113;113merror[0m [2m[3m[38;2;100;116;139mchat[0m [2m[38;2;148;163;184mClaude Code execution failed: [0mAbortError: Claude Code process
+            aborted by user[2m[38;2;148;163;184m
+                at ChildProcess.<anonymous>
+            (file:///home/n/.local/share/fnm/node-versions/v22.14.0/installation/lib/node_modules/[4mclaude-code-webui[24m/node_modules/[4m@anthropic-ai[24m/claude-code/sdk.mjs:6481:28)[2m[38;2;148;163;184m
+            [90m    at ChildProcess.emit (node:events:518:28)[39m[2m[38;2;148;163;184m
+            [90m    at abortChildProcess (node:child_process:716:13)[39m[2m[38;2;148;163;184m
+            [90m    at AbortSignal.onAbortListener (node:child_process:786:7)[39m[2m[38;2;148;163;184m
+            [90m    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:827:20)[39m[2m[38;2;148;163;184m
+            [90m    at AbortSignal.dispatchEvent (node:internal/event_target:762:26)[39m[2m[38;2;148;163;184m
+            [90m    at runAbort (node:internal/abort_controller:447:10)[39m[2m[38;2;148;163;184m
+            [90m    at abortSignal (node:internal/abort_controller:433:3)[39m[2m[38;2;148;163;184m
+            [90m    at AbortController.abort (node:internal/abort_controller:466:5)[39m[2m[38;2;148;163;184m
+                at handleAbortRequest
+            (file:///home/n/.local/share/fnm/node-versions/v22.14.0/installation/lib/node_modules/[4mclaude-code-webui[24m/dist/cli/node.js:2266:21)[2m[38;2;148;163;184m[0m
+ [4m[38;2;248;113;113merror[0m [2m[3m[38;2;100;116;139mchat[0m [2m[38;2;148;163;184mClaude Code execution failed: [0mAbortError: Claude Code process
+            aborted by user[2m[38;2;148;163;184m
+                at ChildProcess.<anonymous>
+            (file:///home/n/.local/share/fnm/node-versions/v22.14.0/installation/lib/node_modules/[4mclaude-code-webui[24m/node_modules/[4m@anthropic-ai[24m/claude-code/sdk.mjs:6481:28)[2m[38;2;148;163;184m
+            [90m    at ChildProcess.emit (node:events:518:28)[39m[2m[38;2;148;163;184m
+            [90m    at abortChildProcess (node:child_process:716:13)[39m[2m[38;2;148;163;184m
+            [90m    at AbortSignal.onAbortListener (node:child_process:786:7)[39m[2m[38;2;148;163;184m
+            [90m    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:827:20)[39m[2m[38;2;148;163;184m
+            [90m    at AbortSignal.dispatchEvent (node:internal/event_target:762:26)[39m[2m[38;2;148;163;184m
+            [90m    at runAbort (node:internal/abort_controller:447:10)[39m[2m[38;2;148;163;184m
+            [90m    at abortSignal (node:internal/abort_controller:433:3)[39m[2m[38;2;148;163;184m
+            [90m    at AbortController.abort (node:internal/abort_controller:466:5)[39m[2m[38;2;148;163;184m
+                at handleAbortRequest
+            (file:///home/n/.local/share/fnm/node-versions/v22.14.0/installation/lib/node_modules/[4mclaude-code-webui[24m/dist/cli/node.js:2266:21)[2m[38;2;148;163;184m[0m

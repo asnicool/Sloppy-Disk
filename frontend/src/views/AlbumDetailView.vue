@@ -67,25 +67,15 @@
 
         <div class="flex flex-wrap gap-3 mt-auto">
              <button @click="handleAction('play')" class="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded transition-colors font-medium">
-                <svg v-if="hasSelection" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-1.664a1 1 0 000-1.664l-3-1.664z" clip-rule="evenodd" />
-                </svg>
+                <span v-html="QueueActionIcons.play"></span>
                 <span>{{ hasSelection ? 'Play Selected' : 'Play Album' }}</span>
              </button>
              <button @click="handleAction('next')" class="flex items-center space-x-2 bg-neutral-700 hover:bg-neutral-600 text-white px-4 py-2 rounded transition-colors font-medium">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                 </svg>
+                <span v-html="QueueActionIcons.next"></span>
                 <span>Play Next</span>
              </button>
              <button @click="handleAction('append')" class="flex items-center space-x-2 bg-neutral-700 hover:bg-neutral-600 text-white px-4 py-2 rounded transition-colors font-medium">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <span v-html="QueueActionIcons.append"></span>
                 <span>Add to Queue</span>
              </button>
              
@@ -264,6 +254,7 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
+import { useQueueActions, QueueActionIcons } from '@/composables/useQueueActions'
 import BaseToast from '@/components/BaseToast.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import MetadataSearchModal from '@/components/MetadataSearchModal.vue'
@@ -271,6 +262,16 @@ import MetadataSearchModal from '@/components/MetadataSearchModal.vue'
 const route = useRoute()
 const router = useRouter()
 const mpdStore = useMpdStore()
+
+// Use shared queue actions composable for selection management
+const {
+  hasSelection,
+  isTrackSelected,
+  getSelectionOrder,
+  toggleSelection,
+  clearSelection,
+  handleAction: handleQueueAction
+} = useQueueActions()
 
 const artistName = computed(() => route.params.artist)
 const albumName = computed(() => route.params.album)
@@ -321,69 +322,30 @@ const showNotification = (message, type = 'success') => {
     showToast.value = true
 }
 
-// Selection State
-const selectedTracks = ref(new Set())
-const selectionOrder = ref([])
-
-const hasSelection = computed(() => selectedTracks.value.size > 0)
-
-const isTrackSelected = (track) => selectedTracks.value.has(track.path)
-
-const getSelectionOrder = (track) => {
-    return selectionOrder.value.indexOf(track.path) + 1
-}
-
-const toggleSelection = (track) => {
-    if (selectedTracks.value.has(track.path)) {
-        selectedTracks.value.delete(track.path)
-        selectionOrder.value = selectionOrder.value.filter(path => path !== track.path)
-    } else {
-        selectedTracks.value.add(track.path)
-        selectionOrder.value.push(track.path)
-    }
-}
-
-const clearSelection = () => {
-    selectedTracks.value.clear()
-    selectionOrder.value = []
-}
-
-const getTargetTracks = () => {
-    // If tracks are selected, use them in selection order
-    if (hasSelection.value) {
-        return selectionOrder.value
-    }
-    // If no tracks selected, use all tracks in album order
-    if (!tracks.value || tracks.value.length === 0) {
-        console.warn('[AlbumDetailView] No tracks available')
-        return []
-    }
-    return tracks.value.map(t => t.path)
-}
-
 const handleAction = async (mode) => {
-    const tracksToAdd = getTargetTracks()
-
-    if (!tracksToAdd || tracksToAdd.length === 0) {
-        showNotification('No tracks to add', 'error')
-        return
-    }
-
+  // If no explicit track selection, delegate to backend album endpoint
+  // which can handle album-level adds more efficiently
+  if (!hasSelection.value && albumDetails.value) {
     try {
-        await mpdStore.addTracks(tracksToAdd, mode)
-        // Feedback
-        if (mode === 'append') showNotification('Added to queue')
-        if (mode === 'next') showNotification('Playing next')
-        if (mode === 'play') {
-             // Already playing
-        }
-        // Only clear selection if tracks were actually selected
-        if (hasSelection.value) {
-            clearSelection()
-        }
+      await mpdStore.addAlbumToPlaylist(artistName.value, albumName.value, mode)
+      if (mode === 'append') showNotification('Added to queue')
+      if (mode === 'next') showNotification('Playing next')
+      if (mode === 'play') showNotification('Playing album')
     } catch (error) {
-        showNotification('Action failed: ' + error.message, 'error')
+      showNotification('Action failed: ' + error.message, 'error')
     }
+    return
+  }
+
+  // Use composable for track selection actions
+  try {
+    await handleQueueAction(mode)
+    if (mode === 'append') showNotification('Added to queue')
+    if (mode === 'next') showNotification('Playing next')
+    if (mode === 'play') showNotification('Playing')
+  } catch (error) {
+    showNotification('Action failed: ' + error.message, 'error')
+  }
 }
 
 const playSingleTrack = (track) => {

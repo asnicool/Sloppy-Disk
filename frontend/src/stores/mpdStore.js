@@ -40,6 +40,14 @@ export const useMpdStore = defineStore('mpd', () => {
   })
   const isSearching = ref(false)
 
+  // Album list cache for preserving selection on navigation back
+  const albumListCache = ref({})
+  const ALBUM_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+  // Search cache for preserving results on navigation back
+  const searchCache = ref({})
+  const SEARCH_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
   // N50 State
   const n50Status = ref(null)
   const n50Inputs = ref([])
@@ -483,7 +491,15 @@ export const useMpdStore = defineStore('mpd', () => {
 
   const addAlbumToPlaylist = async (artist, album, mode = 'append') => {
     try {
-      await axios.post(`${API_BASE}/playlist/album`, { artist, album, mode })
+      // Convert frontend mode names to backend mode names
+      let backendMode = mode
+      if (mode === 'play') {
+        backendMode = 'replace'  // play = clear + add + play
+      } else if (mode === 'next') {
+        backendMode = 'insert'   // next = add after current
+      }
+      console.log('[MPD Store] addAlbumToPlaylist called:', { artist, album, mode: backendMode })
+      await axios.post(`${API_BASE}/playlist/album`, { artist, album, mode: backendMode })
       await fetchPlaylist()
     } catch (error) {
       console.error('Add album to playlist failed:', error)
@@ -983,6 +999,48 @@ export const useMpdStore = defineStore('mpd', () => {
     }
   }
 
+  const setSearchResults = (results) => {
+    if (results.albums !== undefined) searchResults.value.albums = results.albums
+    if (results.artists !== undefined) searchResults.value.artists = results.artists
+    if (results.genres !== undefined) searchResults.value.genres = results.genres
+    if (results.dates !== undefined) searchResults.value.dates = results.dates
+    if (results.songs !== undefined) searchResults.value.songs = results.songs
+  }
+
+  // Album list cache helpers
+  const getAlbumListCache = (key) => {
+    const cached = albumListCache.value[key]
+    if (cached && Date.now() - cached.timestamp < ALBUM_CACHE_TTL) {
+      return cached.data
+    }
+    delete albumListCache.value[key]
+    return null
+  }
+
+  const setAlbumListCache = (key, data) => {
+    albumListCache.value[key] = {
+      data,
+      timestamp: Date.now()
+    }
+  }
+
+  // Search cache helpers
+  const getSearchCache = (key) => {
+    const cached = searchCache.value[key]
+    if (cached && Date.now() - cached.timestamp < SEARCH_CACHE_TTL) {
+      return cached.data
+    }
+    delete searchCache.value[key]
+    return null
+  }
+
+  const setSearchCache = (key, data) => {
+    searchCache.value[key] = {
+      data,
+      timestamp: Date.now()
+    }
+  }
+
   return {
     // State
     status,
@@ -1055,6 +1113,11 @@ export const useMpdStore = defineStore('mpd', () => {
     n50SetInput,
     fetchGenreDateMatrix,
     loadAllAlbums,
-    setupVisibilityRefresh
+    setupVisibilityRefresh,
+    setSearchResults,
+    getAlbumListCache,
+    setAlbumListCache,
+    getSearchCache,
+    setSearchCache
   }
 })
