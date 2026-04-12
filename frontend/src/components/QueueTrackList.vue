@@ -6,13 +6,17 @@
     ghost-class="opacity-50"
     drag-class="cursor-grabbing"
     @change="handleChange"
+    @start="onDragStart"
+    @end="onDragEnd"
     class="flex flex-col gap-1 min-h-[20px]"
   >
-    <template #item="{ element }">
+    <template #item="{ element, index }">
       <div 
         class="flex items-center gap-2 p-2 rounded cursor-grab active:cursor-grabbing group transition-colors select-none"
         :class="getTrackClass(element)"
         v-on="getTrackHandlers(element)"
+        :data-track-pos="element.pos"
+        :data-track-index="index"
       >
         <!-- Track Number / Playing Indicator -->
         <div class="w-6 flex items-center justify-center">
@@ -68,7 +72,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['track-move', 'track-remove'])
+const emit = defineEmits(['track-move', 'track-remove', 'drag-start', 'drag-end', 'dragging'])
 const mpdStore = useMpdStore()
 const { handlers: doubleTapHandlers } = useDoubleTapSimple({ delay: 300 })
 
@@ -112,5 +116,26 @@ const handleChange = (event) => {
     const globalTarget = props.groupStartPos + newIndex
     emit('track-move', { from: element.pos, to: globalTarget })
   }
+}
+
+const onDragStart = (event) => {
+  emit('drag-start')
+  const el = event?.item
+  if (el) {
+    const trackPos = el.getAttribute('data-track-pos')
+    const trackIndex = el.getAttribute('data-track-index')
+    if (trackPos !== null) {
+      emit('dragging', { 
+        type: 'track', 
+        pos: parseInt(trackPos, 10), 
+        groupStartPos: props.groupStartPos,
+        index: trackIndex ? parseInt(trackIndex, 10) : -1
+      })
+    }
+  }
+}
+
+const onDragEnd = () => {
+  emit('drag-end')
 }
 </script>

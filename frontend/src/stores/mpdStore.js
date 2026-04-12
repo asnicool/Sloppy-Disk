@@ -517,6 +517,26 @@ export const useMpdStore = defineStore('mpd', () => {
     }
   }
 
+  const removeMultipleFromPlaylist = async (positions) => {
+    try {
+      // Remove all at once without fetching in between - let MPD handle all deletions
+      // then fetch playlist once at the end
+      const sortedPositions = [...positions].sort((a, b) => b - a)
+      console.log('[MPD Store] removeMultipleFromPlaylist: removing positions:', sortedPositions)
+      
+      for (const pos of sortedPositions) {
+        console.log('[MPD Store] Removing position:', pos)
+        await axios.post(`${API_BASE}/playlist/remove/${pos}`)
+      }
+      
+      console.log('[MPD Store] All removals done, fetching playlist')
+      await fetchPlaylist()
+    } catch (error) {
+      console.error('Remove multiple from playlist failed:', error)
+      throw error
+    }
+  }
+
   const fetchPlaylist = async () => {
     try {
       console.log('[MPD Store] Fetching playlist...')
@@ -524,7 +544,10 @@ export const useMpdStore = defineStore('mpd', () => {
       if (response.data.success) {
         console.log('[MPD Store] Playlist fetched, items:', response.data.data.items.length)
         playlist.value = response.data.data.items
-        playlistCurrentPos.value = response.data.data.currentPos
+        // Use currentPos from backend, fallback to -1 if not present
+        const pos = response.data.data.currentPos
+        playlistCurrentPos.value = (pos !== undefined && pos !== null) ? pos : -1
+        console.log('[MPD Store] Current position set to:', playlistCurrentPos.value)
       }
       return response.data
     } catch (error) {
@@ -1087,6 +1110,7 @@ export const useMpdStore = defineStore('mpd', () => {
     addToPlaylist,
     addAlbumToPlaylist,
     removeFromPlaylist,
+    removeMultipleFromPlaylist,
     fetchPlaylist,
     moveTrack,
     moveAlbum,
