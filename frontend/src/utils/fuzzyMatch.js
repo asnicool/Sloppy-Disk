@@ -91,21 +91,20 @@ export function sortByRelevance(items, query, fields, strict = false) {
   }
 
   // Escape special characters that have meaning in Fuse.js extended search
-  // Characters: ! ' " ^ $ | and space (for AND/OR operators)
-  // We escape them by prepending with backslash, BUT we need to be careful:
-  // - First, escape existing backslashes
-  // - Then escape the special characters
-  let escapedQuery = queryStr.replace(/\\/g, '\\\\')
+  // Characters: ! " ^ $ | and space (for AND/OR operators)
+  // Single quote ' is also special in extended search
   
-  // Check if the query contains special extended search characters
-  // If so, we need to escape them to treat them as literal characters
-  const specialChars = /[!'"^$| ]/
-  if (specialChars.test(escapedQuery)) {
-    // Escape each special character by wrapping in quotes or escaping
-    // Use = for exact match (include) as a safe way to search literal strings
-    // Or wrap in double quotes for exact match
-    // The safest approach is to escape each special char with a backslash
-    escapedQuery = escapedQuery.replace(/([!'"^$|])/g, '\\$1')
+  // Check if query contains special characters that need escaping
+  const specialCharsRegex = /[!"^$| ]/
+  
+  let escapedQuery
+  if (specialCharsRegex.test(queryStr)) {
+    // Use = prefix to force "include" matching, which treats special chars literally
+    // This is more reliable than backslash escaping for strict mode
+    escapedQuery = '=' + queryStr
+  } else {
+    // No special chars - use as-is for normal fuzzy matching
+    escapedQuery = queryStr
   }
 
   // Fuse.js options
