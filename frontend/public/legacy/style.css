@@ -1,0 +1,290 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #333;
+  background: #f5f5f5;
+  padding: 10px;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #fff;
+  padding: 15px;
+}
+
+h1 {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+h2 {
+  font-size: 18px;
+  margin: 20px 0 10px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 5px;
+}
+
+/* Header & Status */
+.header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.status-bar {
+  background: #333;
+  color: #fff;
+  padding: 10px;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+#play-status {
+  font-weight: bold;
+  color: #4CAF50;
+}
+
+#play-status.stopped {
+  color: #999;
+}
+
+#current-song {
+  font-size: 16px;
+}
+
+#elapsed-time {
+  font-size: 12px;
+  color: #aaa;
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.btn {
+  padding: 10px 20px;
+  font-size: 14px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  background: #2196F3;
+  color: #fff;
+}
+
+.btn:hover {
+  background: #1976D2;
+}
+
+.btn-control {
+  min-width: 60px;
+}
+
+.btn-play, .btn-pause {
+  min-width: 100px;
+  font-weight: bold;
+}
+
+.btn-small {
+  padding: 5px 10px;
+  font-size: 12px;
+  background: #4CAF50;
+}
+
+.btn-small:hover {
+  background: #388E3C;
+}
+
+.btn-queue {
+  background: #FF9800;
+}
+
+.btn-queue:hover {
+  background: #F57C00;
+}
+
+/* Search */
+.search-section {
+  margin-bottom: 20px;
+}
+
+.search-form {
+  display: flex;
+  gap: 10px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.results {
+  margin-top: 10px;
+}
+
+.result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.result-item:hover {
+  background: #f9f9f9;
+}
+
+.result-info {
+  flex: 1;
+}
+
+.result-title {
+  font-weight: bold;
+}
+
+.result-artist {
+  font-size: 12px;
+  color: #666;
+}
+
+.result-actions {
+  display: flex;
+  gap: 5px;
+}
+
+/* Albums Grid */
+.albums-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.album-card {
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  padding: 10px;
+  text-align: center;
+  background: #fff;
+}
+
+.album-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  background: #eee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+  color: #999;
+  font-size: 12px;
+}
+
+.album-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.album-title {
+  font-weight: bold;
+  font-size: 13px;
+  margin-bottom: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.album-artist {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.album-actions {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+
+/* Queue */
+.queue-list {
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.queue-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.queue-item:hover {
+  background: #f9f9f9;
+}
+
+.queue-item.active {
+  background: #e3f2fd;
+}
+
+.queue-info {
+  flex: 1;
+}
+
+.queue-pos {
+  width: 30px;
+  color: #999;
+  font-size: 12px;
+}
+
+.queue-title {
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.queue-artist {
+  font-size: 12px;
+  color: #666;
+}
+
+.loading, .empty {
+  text-align: center;
+  color: #999;
+  padding: 20px;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .container {
+    padding: 10px;
+  }
+
+  .albums-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .controls {
+    flex-wrap: wrap;
+  }
+}

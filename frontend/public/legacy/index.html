@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Music Player - Legacy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header with Play Status -->
+    <header class="header">
+      <h1>Music Player</h1>
+      <div id="status-bar" class="status-bar">
+        <span id="play-status">Loading...</span>
+        <span id="current-song"></span>
+        <span id="elapsed-time"></span>
+      </div>
+    </header>
+
+    <!-- Player Controls -->
+    <div class="controls">
+      <button id="btn-prev" class="btn btn-control">&#9664;&#9664;</button>
+      <button id="btn-play" class="btn btn-control btn-play">Play</button>
+      <button id="btn-pause" class="btn btn-control btn-pause" style="display:none;">Pause</button>
+      <button id="btn-next" class="btn btn-control">&#9654;&#9654;</button>
+    </div>
+
+    <!-- Search Section -->
+    <section class="search-section">
+      <h2>Search</h2>
+      <div class="search-form">
+        <input type="text" id="search-input" class="search-input" placeholder="Search artists, albums, songs...">
+        <button id="btn-search" class="btn">Search</button>
+      </div>
+      <div id="search-results" class="results"></div>
+    </section>
+
+    <!-- Random Albums Section -->
+    <section class="albums-section">
+      <h2>Random Albums</h2>
+      <div id="albums-grid" class="albums-grid">
+        <p class="loading">Loading albums...</p>
+      </div>
+    </section>
+
+    <!-- Queue Section -->
+    <section class="queue-section">
+      <h2>Queue</h2>
+      <div id="queue-list" class="queue-list">
+        <p class="empty">Queue is empty</p>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
