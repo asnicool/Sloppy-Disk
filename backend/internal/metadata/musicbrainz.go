@@ -230,6 +230,16 @@ func artistCreditString(ac gomusicbrainz.ArtistCredit) string {
 	return sb.String()
 }
 
+// GetArtistImage fetches artist images from MusicBrainz
+// Note: MusicBrainz doesn't directly host artist images, but provides links to external sources
+// This implementation is a placeholder - Discogs is the primary source for artist images
+func (p *MusicBrainzProvider) GetArtistImage(artistName string) ([]models.ArtistImageCandidate, error) {
+	// MusicBrainz primarily provides metadata and links to external resources
+	// The main artist images come from Discogs
+	// For now, return empty - Discogs is the primary source
+	return []models.ArtistImageCandidate{}, nil
+}
+
 // GetCoverArt fetches cover art from Cover Art Archive
 func (p *MusicBrainzProvider) GetCoverArt(artist, album string) ([]models.CoverArtCandidate, error) {
 	// Re-using exiting Search logic

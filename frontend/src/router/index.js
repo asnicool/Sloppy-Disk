@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 // Import views
 import AlbumsView from '@/views/AlbumsView.vue'
 import ArtistsView from '@/views/ArtistsView.vue'
+import ArtistDetailView from '@/views/ArtistDetailView.vue'
 import AlbumDetailView from '@/views/AlbumDetailView.vue'
 import SearchView from '@/views/SearchView.vue'
 import ConfigurationView from '@/views/ConfigurationView.vue'
@@ -31,6 +32,11 @@ const routes = [
     path: '/artists',
     name: 'artists',
     component: ArtistsView
+  },
+  {
+    path: '/artist',
+    name: 'artist-detail',
+    component: ArtistDetailView
   },
   {
     path: '/search',

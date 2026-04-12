@@ -142,8 +142,15 @@
             @click="navigateToArtist(artist)"
             class="bg-neutral-800/40 p-3 rounded-lg hover:bg-neutral-700/60 transition-colors cursor-pointer text-center group border border-neutral-800"
           >
-            <div class="w-12 h-12 bg-neutral-700 rounded-full mx-auto mb-2 flex items-center justify-center text-neutral-400 group-hover:text-primary-300 transition-colors">
-              <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+            <div class="w-12 h-12 rounded-full mx-auto mb-2 overflow-hidden bg-neutral-700 flex items-center justify-center">
+              <img 
+                v-if="artistImages[artist]" 
+                :src="artistImages[artist]" 
+                @error="handleArtistImageError(artist)"
+                class="w-full h-full object-cover"
+                :alt="artist"
+              />
+              <svg v-else class="w-6 h-6 text-neutral-400 group-hover:text-primary-300 transition-colors" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
               </svg>
             </div>
@@ -422,6 +429,7 @@ const localAlbums = ref([])
 const localArtists = ref([])
 const localGenres = ref([])
 const localDates = ref([])
+const artistImages = ref({}) // Cache for artist images
 
 // Display Limits
 const displayLimitArtists = ref(30)
@@ -436,6 +444,86 @@ const categories = [
   { id: 'genres', name: 'Genres' },
   { id: 'dates', name: 'Dates' }
 ]
+
+// Helper to build artist image URL
+const getArtistImageUrl = (artistName) => {
+  const encodedArtist = encodeURIComponent(artistName).replace(/%2F/g, '/')
+  return `/folder/${encodedArtist}/Artist.jpg`
+}
+
+// Fetch artist images when artists list changes
+const fetchArtistImages = async () => {
+  console.log('[SearchView] fetchArtistImages called, artists:', localArtists.value.slice(0, 5))
+  const artistsToFetch = localArtists.value.slice(0, 50) // Limit initial fetch
+  for (const artist of artistsToFetch) {
+    if (!artist || typeof artist !== 'string') {
+      console.warn('[SearchView] Skipping invalid artist:', artist)
+      continue
+    }
+    if (!artistImages.value[artist]) {
+      const url = getArtistImageUrl(artist)
+      console.log('[SearchView] Trying image for:', artist, 'URL:', url)
+      // Try to load - will fail silently if not found
+      try {
+        const img = new Image()
+        img.onload = () => {
+          console.log('[SearchView] Image loaded for:', artist)
+          artistImages.value[artist] = url
+        }
+        img.onerror = () => {
+          console.log('[SearchView] Image not found for:', artist, '- triggering fetch')
+          // Image not found, trigger auto-fetch
+          fetchAndCacheArtistImage(artist)
+        }
+        img.src = url
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+  }
+}
+
+// Auto-fetch and cache artist image
+const fetchAndCacheArtistImage = async (artistName) => {
+  console.log('[SearchView] fetchAndCacheArtistImage called for:', artistName)
+  try {
+    const encodedArtist = encodeURIComponent(artistName)
+    console.log('[SearchView] Calling API with encoded:', encodedArtist)
+    const response = await fetch(`/api/artistart/candidates?artist=${encodedArtist}`)
+    console.log('[SearchView] API response status:', response.status)
+    if (!response.ok) {
+      console.warn(`Artist API returned ${response.status} for ${artistName}`)
+      return
+    }
+    const data = await response.json()
+    console.log('[SearchView] API data:', data)
+    if (data.success && data.data && data.data.length > 0) {
+      const firstCandidate = data.data[0]
+      console.log('[SearchView] Got candidate:', firstCandidate)
+      // Apply the first candidate to cache it
+      await fetch('/api/artistart/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artist: artistName,
+          imageUrl: firstCandidate.url
+        })
+      })
+      // Update the image cache
+      artistImages.value[artistName] = getArtistImageUrl(artistName)
+    }
+  } catch (e) {
+    console.error('[SearchView] Failed to fetch artist image:', e)
+  }
+}
+
+// Handle image load error
+const handleArtistImageError = (artist) => {
+  // Remove the broken URL from cache
+  if (artistImages.value[artist]) {
+    delete artistImages.value[artist]
+  }
+}
 
 // --- Initialization ---
 
@@ -599,6 +687,8 @@ const triggerSearchRaw = async () => {
     if (cached.songs) {
       mpdStore.setSearchResults({ songs: cached.songs })
     }
+    // Fetch artist images for cached results
+    fetchArtistImages()
     return
   }
 
@@ -613,6 +703,9 @@ const triggerSearchRaw = async () => {
   localArtists.value = localResults.artists
   localGenres.value = localResults.genres
   localDates.value = localResults.dates
+  
+  // Fetch artist images after getting artist list
+  fetchArtistImages()
   
   // 2. MPD Search (Songs)
   performMpdSearch(terms.join(' '))

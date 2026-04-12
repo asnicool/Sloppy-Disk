@@ -173,3 +173,13 @@ type AlbumMetadata struct {
 	Confidence float64                `json:"confidence,omitempty"`
 	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 }
+
+// ArtistImageCandidate represents an artist image from external sources
+type ArtistImageCandidate struct {
+	Source    string `json:"source"`
+	URL       string `json:"url"`
+	Thumbnail string `json:"thumbnail,omitempty"`
+	Width     int    `json:"width,omitempty"`
+	Height    int    `json:"height,omitempty"`
+	License   string `json:"license,omitempty"`
+}

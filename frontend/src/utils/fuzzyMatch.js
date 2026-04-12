@@ -90,6 +90,24 @@ export function sortByRelevance(items, query, fields, strict = false) {
      return items.map(item => ({ ...item, _relevance: 0 }))
   }
 
+  // Escape special characters that have meaning in Fuse.js extended search
+  // Characters: ! ' " ^ $ | and space (for AND/OR operators)
+  // We escape them by prepending with backslash, BUT we need to be careful:
+  // - First, escape existing backslashes
+  // - Then escape the special characters
+  let escapedQuery = queryStr.replace(/\\/g, '\\\\')
+  
+  // Check if the query contains special extended search characters
+  // If so, we need to escape them to treat them as literal characters
+  const specialChars = /[!'"^$| ]/
+  if (specialChars.test(escapedQuery)) {
+    // Escape each special character by wrapping in quotes or escaping
+    // Use = for exact match (include) as a safe way to search literal strings
+    // Or wrap in double quotes for exact match
+    // The safest approach is to escape each special char with a backslash
+    escapedQuery = escapedQuery.replace(/([!'"^$|])/g, '\\$1')
+  }
+
   // Fuse.js options
   const options = {
     keys: fields,
@@ -103,7 +121,7 @@ export function sortByRelevance(items, query, fields, strict = false) {
   }
 
   const fuse = new Fuse(items, options)
-  const fuseResults = fuse.search(queryStr)
+  const fuseResults = fuse.search(escapedQuery)
 
   // Split query into tokens for coverage scoring
   const tokens = queryStr.toLowerCase().split(/\s+/).filter(t => t.length > 1)

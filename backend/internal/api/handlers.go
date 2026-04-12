@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"mpd-client-modern/internal/artistimage"
 	"mpd-client-modern/internal/config"
 	"mpd-client-modern/internal/coverart"
 	"mpd-client-modern/internal/metadata"
@@ -84,6 +85,11 @@ func RegisterRoutes(r *mux.Router) {
 	api.HandleFunc("/coverart/apply", ApplyCoverArt).Methods("POST")
 	api.HandleFunc("/coverart/upload", UploadCoverArt).Methods("POST")
 	api.HandleFunc("/coverart/{path:.*}", GetCoverArt).Methods("GET")
+
+	// Artist Art
+	api.HandleFunc("/artistart/candidates", GetArtistArtCandidates).Methods("GET")
+	api.HandleFunc("/artistart/apply", ApplyArtistArt).Methods("POST")
+	api.HandleFunc("/artistart/{artist}/candidates", GetArtistArtCandidatesByArtist).Methods("GET")
 
 	// WebSockets
 	r.HandleFunc("/ws", WebsocketHandler)
@@ -949,4 +955,74 @@ func SendError(w http.ResponseWriter, code int, message string) {
 func GetCircuitBreakerStats(w http.ResponseWriter, r *http.Request) {
 	stats := MPDCircuitBreaker.GetStats()
 	SendJSON(w, models.APIResponse{Success: true, Data: stats})
+}
+
+// Artist Art handlers
+
+func GetArtistArtCandidates(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[API] GetArtistArtCandidates called")
+	artist := r.URL.Query().Get("artist")
+	if artist == "" {
+		SendError(w, http.StatusBadRequest, "artist parameter is required")
+		return
+	}
+	log.Printf("[API] GetArtistArtCandidates for artist: %s", artist)
+
+	manager := artistimage.NewManager()
+	candidates, err := manager.FetchCandidates(artist)
+	if err != nil {
+		log.Printf("[API] GetArtistArtCandidates error: %v", err)
+		SendError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	log.Printf("[API] GetArtistArtCandidates found %d candidates", len(candidates))
+
+	SendJSON(w, models.APIResponse{Success: true, Data: candidates})
+}
+
+func GetArtistArtCandidatesByArtist(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	artist, err := url.PathUnescape(vars["artist"])
+	if err != nil {
+		artist = vars["artist"]
+	}
+
+	if artist == "" {
+		SendError(w, http.StatusBadRequest, "artist parameter is required")
+		return
+	}
+
+	manager := artistimage.NewManager()
+	candidates, err := manager.FetchCandidates(artist)
+	if err != nil {
+		SendError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	SendJSON(w, models.APIResponse{Success: true, Data: candidates})
+}
+
+func ApplyArtistArt(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Artist   string `json:"artist"`
+		ImageURL string `json:"imageUrl"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		SendError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	if req.Artist == "" || req.ImageURL == "" {
+		SendError(w, http.StatusBadRequest, "artist and imageUrl are required")
+		return
+	}
+
+	manager := artistimage.NewManager()
+	if err := manager.ApplyArtistImage(req.Artist, req.ImageURL); err != nil {
+		SendError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	SendJSON(w, models.APIResponse{Success: true})
 }

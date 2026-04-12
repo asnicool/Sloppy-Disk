@@ -81,6 +81,9 @@ func main() {
 	// Static file serving for music folder (for cover art)
 	// This serves files from the musicRoot directory at /folder path
 	cfg := config.Get()
+
+	// Determine root directories to serve
+	var roots []string
 	if cfg.MusicRoot != "" {
 		musicRoot := cfg.MusicRoot
 		// Ensure musicRoot is an absolute path
@@ -90,8 +93,35 @@ func main() {
 				musicRoot = filepath.Join(filepath.Dir(absConfigPath), musicRoot)
 			}
 		}
+		roots = append(roots, musicRoot)
 		log.Printf("Serving music files from: %s", musicRoot)
-		r.PathPrefix("/folder/").Handler(http.StripPrefix("/folder/", http.FileServer(http.Dir(musicRoot))))
+	}
+
+	// Also serve CoverArtRoot if configured (for artist images and album covers)
+	if cfg.CoverArtRoot != "" {
+		coverArtRoot := cfg.CoverArtRoot
+		if !filepath.IsAbs(coverArtRoot) {
+			if absConfigPath, err := filepath.Abs(configPath); err == nil {
+				coverArtRoot = filepath.Join(filepath.Dir(absConfigPath), coverArtRoot)
+			}
+		}
+		// Avoid duplicate if CoverArtRoot is same as MusicRoot
+		isDuplicate := false
+		for _, r := range roots {
+			if r == coverArtRoot {
+				isDuplicate = true
+				break
+			}
+		}
+		if !isDuplicate {
+			roots = append(roots, coverArtRoot)
+			log.Printf("Serving cover art root from: %s", coverArtRoot)
+		}
+	}
+
+	// Serve multiple roots using a combined handler
+	if len(roots) > 0 {
+		r.PathPrefix("/folder/").Handler(http.StripPrefix("/folder/", http.FileServer(http.Dir(roots[0]))))
 	}
 
 	// Static file serving for frontend
