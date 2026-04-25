@@ -142,7 +142,15 @@
             </td>
             <td class="px-4 py-2 text-right text-sm" :class="{ 'opacity-50': hasSelection && !isTrackSelected(track) }">{{ formatDuration(track.duration) }}</td>
             <td class="px-4 py-2 text-sm" :class="{ 'text-white': !hasSelection || isTrackSelected(track) }">
-              <div class="truncate" :title="track.title">{{ track.title }}</div>
+              <div class="flex items-center space-x-2 truncate" :title="track.title">
+                <span class="truncate flex-1">{{ track.title }}</span>
+                <span 
+                  class="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0"
+                  :class="getFileExtensionClass(track.path)"
+                >
+                  {{ getFileExtension(track.path) }}
+                </span>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -501,6 +509,28 @@ const formatDuration = (seconds) => {
   const minutes = Math.floor(seconds / 60)
   const remainingSeconds = Math.floor(seconds % 60)
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+}
+
+const getFileExtension = (path) => {
+  if (!path) return ''
+  const ext = path.split('.').pop()?.toLowerCase() || ''
+  return ext
+}
+
+const getFileExtensionClass = (path) => {
+  const ext = getFileExtension(path)
+  const classes = {
+    'flac': 'bg-purple-600 bg-opacity-20 text-purple-400',
+    'mp3': 'bg-blue-600 bg-opacity-20 text-blue-400',
+    'ogg': 'bg-orange-600 bg-opacity-20 text-orange-400',
+    'wav': 'bg-green-600 bg-opacity-20 text-green-400',
+    'aac': 'bg-pink-600 bg-opacity-20 text-pink-400',
+    'm4a': 'bg-pink-600 bg-opacity-20 text-pink-400',
+    'alac': 'bg-purple-600 bg-opacity-20 text-purple-400',
+    'aiff': 'bg-green-600 bg-opacity-20 text-green-400',
+    'wma': 'bg-yellow-600 bg-opacity-20 text-yellow-400',
+  }
+  return classes[ext] || 'bg-neutral-600 bg-opacity-20 text-neutral-400'
 }
 
 const navigateToArtist = () => {

@@ -80,32 +80,42 @@ export function calculateRelevanceScore(item, query, fields, strict = false) {
  * @returns {Array} - Sorted array with relevance scores attached
  */
 export function sortByRelevance(items, query, fields, strict = false) {
+  console.log('[fuzzyMatch] sortByRelevance called:', { query, fields, strict, itemsCount: items?.length })
+  
   if (!query || !items || items.length === 0 || !fields || fields.length === 0) {
+    console.log('[fuzzyMatch] Early exit: missing params')
     return (items || []).map(item => ({ ...item, _relevance: 0 }))
   }
 
   // Ensure query is a string and not empty
   const queryStr = (Array.isArray(query) ? query.join(' ') : String(query || '')).trim()
+  console.log('[fuzzyMatch] queryStr:', queryStr)
+  
   if (!queryStr) {
+     console.log('[fuzzyMatch] Empty query after trim')
      return items.map(item => ({ ...item, _relevance: 0 }))
   }
 
   // Escape special characters that have meaning in Fuse.js extended search
   // Characters: ! " ^ $ | and space (for AND/OR operators)
-  // Single quote ' is also special in extended search
+  // Single quote ' is used for "include" matching in extended search
   
   // Check if query contains special characters that need escaping
   const specialCharsRegex = /[!"^$| ]/
+  console.log('[fuzzyMatch] has special chars:', specialCharsRegex.test(queryStr))
   
   let escapedQuery
   if (specialCharsRegex.test(queryStr)) {
-    // Use = prefix to force "include" matching, which treats special chars literally
-    // This is more reliable than backslash escaping for strict mode
-    escapedQuery = '=' + queryStr
+    // Use ' prefix for "include" matching - treats query as literal substring
+    // This allows fuzzy matching while preserving spaces in the query
+    // Unlike = prefix which requires exact match
+    escapedQuery = "'" + queryStr
   } else {
     // No special chars - use as-is for normal fuzzy matching
     escapedQuery = queryStr
   }
+  
+  console.log('[fuzzyMatch] escapedQuery:', escapedQuery)
 
   // Fuse.js options
   const options = {
@@ -119,8 +129,11 @@ export function sortByRelevance(items, query, fields, strict = false) {
     useExtendedSearch: true
   }
 
+  console.log('[fuzzyMatch] creating Fuse with options:', { keys: fields, threshold: options.threshold })
   const fuse = new Fuse(items, options)
+  console.log('[fuzzyMatch] searching for:', escapedQuery)
   const fuseResults = fuse.search(escapedQuery)
+  console.log('[fuzzyMatch] fuseResults count:', fuseResults.length)
 
   // Split query into tokens for coverage scoring
   const tokens = queryStr.toLowerCase().split(/\s+/).filter(t => t.length > 1)
