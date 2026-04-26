@@ -46,9 +46,10 @@ type PlaylistItem struct {
 
 // PlaylistInfo represents the full playlist state for the frontend
 type PlaylistInfo struct {
-	Items      []PlaylistItem `json:"items"`
-	Length     int            `json:"length"`
-	CurrentPos int            `json:"currentPos"`
+	Items          []PlaylistItem `json:"items"`
+	Length         int            `json:"length"`
+	CurrentPos     int            `json:"currentPos"`
+	CurrentSongPath string        `json:"currentSongPath,omitempty"` // Path of currently playing song for identity-based tracking
 }
 
 // MPDStatus represents current MPD playback status
@@ -172,4 +173,14 @@ type AlbumMetadata struct {
 	Provider   string                 `json:"provider"`
 	Confidence float64                `json:"confidence,omitempty"`
 	Metadata   map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// ArtistImageCandidate represents an artist image from external sources
+type ArtistImageCandidate struct {
+	Source    string `json:"source"`
+	URL       string `json:"url"`
+	Thumbnail string `json:"thumbnail,omitempty"`
+	Width     int    `json:"width,omitempty"`
+	Height    int    `json:"height,omitempty"`
+	License   string `json:"license,omitempty"`
 }

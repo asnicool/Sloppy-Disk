@@ -8,9 +8,17 @@
             @click="navigateToArtist(artistGroup.artist)"
             :title="'Click to view all albums by ' + (artistGroup.artist || 'Unknown Artist')"
         >
-          <svg class="w-6 h-6 mr-2 text-neutral-400" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
-          </svg>
+          <div class="w-10 h-10 rounded-full mr-2 overflow-hidden bg-neutral-700 flex-shrink-0">
+            <img 
+              v-if="artistImages[artistGroup.artist]" 
+              :src="artistImages[artistGroup.artist]" 
+              class="w-full h-full object-cover"
+              :alt="artistGroup.artist"
+            />
+            <svg v-else class="w-full h-full p-2 text-neutral-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+            </svg>
+          </div>
           {{ artistGroup.artist || 'Unknown Artist' }}
         </h2>
         
@@ -67,18 +75,79 @@ const totalPages = ref(1)
 const totalArtists = ref(0)
 const hasMore = ref(false)
 const itemsPerPage = 50
+const artistImages = ref({}) // Cache for artist images
+
+// Helper to build artist image URL
+const getArtistImageUrl = (artistName) => {
+  const encodedArtist = encodeURIComponent(artistName).replace(/%2F/g, '/')
+  return `/folder/${encodedArtist}/Artist.jpg`
+}
+
+// Fetch artist images for displayed artists
+const fetchArtistImages = () => {
+  console.log('[ArtistsView] fetchArtistImages called, groups:', artists.value.slice(0, 3).map(g => g.artist))
+  artists.value.forEach(artistGroup => {
+    const artist = artistGroup.artist
+    console.log('[ArtistsView] Processing artist:', artist)
+    if (!artistImages.value[artist]) {
+      const url = getArtistImageUrl(artist)
+      const img = new Image()
+      img.onload = () => {
+        console.log('[ArtistsView] Image loaded for:', artist)
+        artistImages.value[artist] = url
+      }
+      img.onerror = () => {
+        console.log('[ArtistsView] Image not found for:', artist)
+        // Trigger auto-fetch
+        fetchAndCacheArtistImage(artist)
+      }
+      img.src = url
+    }
+  })
+}
+
+// Auto-fetch and cache artist image
+const fetchAndCacheArtistImage = async (artistName) => {
+  console.log('[ArtistsView] fetchAndCacheArtistImage called for:', artistName)
+  try {
+    const response = await fetch(`/api/artistart/candidates?artist=${encodeURIComponent(artistName)}`)
+    if (!response.ok) {
+      console.warn('[ArtistsView] Artist API returned:', response.status)
+      return
+    }
+    const data = await response.json()
+    console.log('[ArtistsView] API response:', data)
+    if (data.success && data.data && data.data.length > 0) {
+      const firstCandidate = data.data[0]
+      await fetch('/api/artistart/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artist: artistName,
+          imageUrl: firstCandidate.url
+        })
+      })
+      artistImages.value[artistName] = getArtistImageUrl(artistName)
+    }
+  } catch (e) {
+    console.error('[ArtistsView] Failed to fetch artist image:', e)
+  }
+}
 
 const loadArtists = async () => {
   loading.value = true
   try {
     const response = await mpdStore.fetchArtists(currentPage.value, itemsPerPage)
     if (response.success) {
+      console.log('[ArtistsView] API response data:', response.data)
       artists.value = response.data
       if (response.meta) {
         totalArtists.value = response.meta.total || 0
         hasMore.value = response.meta.hasMore || false
         totalPages.value = Math.ceil(totalArtists.value / itemsPerPage)
       }
+      // Fetch artist images after loading
+      fetchArtistImages()
     }
   } finally {
     loading.value = false
@@ -106,7 +175,7 @@ const navigateToAlbum = (artist, album) => {
 }
 
 const navigateToArtist = (artist) => {
-  router.push({ name: 'search', query: { q: artist, type: 'artist' } })
+  router.push({ name: 'artist-detail', query: { artist } })
 }
 
 onMounted(async () => {

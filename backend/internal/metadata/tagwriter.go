@@ -12,9 +12,9 @@ import (
 
 	"go.senan.xyz/taglib"
 
-	"mpd-client-modern/internal/config"
-	"mpd-client-modern/internal/models"
-	"mpd-client-modern/internal/mpd"
+	"sloppy-disk/internal/config"
+	"sloppy-disk/internal/models"
+	"sloppy-disk/internal/mpd"
 )
 
 // AudioExtensions contains all supported audio file extensions

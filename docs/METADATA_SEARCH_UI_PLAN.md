@@ -562,7 +562,7 @@ Update `backend/config.json` with metadata provider settings:
         "enabled": true,
         "baseUrl": "https://musicbrainz.org/ws/2",
         "rateLimit": 1,
-        "userAgent": "mpd-client-modern/1.0"
+        "userAgent": "sloppy-disk/1.0"
       },
       "discogs": {
         "enabled": true,

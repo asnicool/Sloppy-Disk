@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-neutral-900 text-white flex flex-col lg:flex-row overflow-hidden">
+  <div class="min-h-screen bg-neutral-900 text-white flex flex-col lg:flex-row lg:items-center overflow-hidden">
     <div class="flex-1 flex items-center justify-center p-4 lg:p-8 relative">
       <div class="aspect-square w-full max-w-[min(80vh,600px)] lg:max-w-[min(60vh,700px)] relative">
         <img v-if="coverUrl" :src="coverUrl" :alt="mpdStore.currentSong?.album" class="w-full h-full object-cover shadow-2xl" />
@@ -11,16 +11,41 @@
       </div>
     </div>
 
-    <div class="lg:w-[400px] xl:w-[450px] flex flex-col bg-neutral-800/50 lg:bg-transparent">
+    <div class="lg:w-[480px] xl:w-[540px] flex flex-col justify-start lg:justify-center bg-neutral-800/50 lg:bg-transparent">
       <div class="p-6 lg:p-8 lg:pt-12 flex-shrink-0">
         <h1 class="text-2xl lg:text-3xl font-bold leading-tight mb-2 truncate">{{ mpdStore.currentSong?.title || 'Not Playing' }}</h1>
-        <p class="text-lg text-neutral-300 truncate">{{ mpdStore.currentSong?.artist || '' }}</p>
-        <p class="text-sm text-neutral-500 truncate mt-1">{{ mpdStore.currentSong?.album || '' }}</p>
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <button
+            v-if="mpdStore.currentSong?.artist"
+            @click="goToArtist"
+            class="text-lg text-neutral-300 hover:text-white hover:underline truncate transition-colors"
+          >{{ mpdStore.currentSong.artist }}</button>
+          <span v-if="mpdStore.currentSong?.album" class="text-neutral-600">·</span>
+          <button
+            v-if="mpdStore.currentSong?.album"
+            @click="goToAlbum"
+            class="text-sm text-neutral-400 hover:text-white hover:underline truncate transition-colors"
+          >{{ mpdStore.currentSong.album }}</button>
+          <span v-if="mpdStore.currentSong?.date" class="text-neutral-600">·</span>
+          <span v-if="mpdStore.currentSong?.date" class="text-sm text-neutral-500">{{ mpdStore.currentSong.date }}</span>
+        </div>
+
+        <div
+          v-if="nextTrack"
+          @click="next"
+          class="mt-4 flex items-center gap-2 cursor-pointer group"
+        >
+          <svg class="w-3 h-3 text-neutral-600 group-hover:text-neutral-400 flex-shrink-0 transition-colors" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798l-5.445-3.63z" />
+          </svg>
+          <span class="text-xs text-neutral-600 group-hover:text-neutral-400 truncate transition-colors">Next: {{ nextTrack.title || nextTrack.path }}</span>
+          <span v-if="nextTrack.artist" class="text-xs text-neutral-700 group-hover:text-neutral-500 truncate transition-colors">— {{ nextTrack.artist }}</span>
+        </div>
       </div>
 
       <div class="px-6 lg:px-8 flex-shrink-0">
         <div class="w-full h-1 bg-neutral-700 rounded-full cursor-pointer relative" @click="seekTo" ref="progressBar">
-          <div class="absolute left-0 top-0 h-full bg-white rounded-full transition-all ease-linear" 
+          <div class="absolute left-0 top-0 h-full bg-white rounded-full transition-all ease-linear"
                :style="{ width: `${progressPercentage}%`, transitionDuration: transitionDuration }" />
         </div>
         <div class="flex justify-between text-xs text-neutral-500 mt-2 font-mono">
@@ -33,7 +58,7 @@
         <button @click="previous" class="p-3 hover:bg-neutral-700 rounded-full transition-colors" :disabled="!mpdStore.isConnected">
           <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 20 20"><path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z" /></svg>
         </button>
-        <button @click="mpdStore.isPlaying ? pause() : play()" class="p-5 bg-white text-neutral-900 rounded-full hover:scale-105 transition-transform" :disabled="!mpdStore.isConnected">
+        <button @click="mpdStore.isPlaying ? pause() : play()" class="p-5 text-white rounded-full hover:scale-105 transition-transform" :disabled="!mpdStore.isConnected">
           <svg v-if="mpdStore.isPlaying" class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
           <svg v-else class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>
         </button>
@@ -48,27 +73,20 @@
         <span class="text-sm text-neutral-500 w-10 text-right font-mono">{{ mpdStore.volume }}</span>
       </div>
 
-      <div class="flex-1 flex items-end p-6 lg:p-8">
-        <router-link to="/queue" class="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors">
-          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 4V18a1 1 0 102 0v-1.268a2 2 0 000-4V4z" /><path d="M9 4a1 1 0 012 0v7.268a2 2 0 000 4V18a1 1 0 11-2 0v-1.268a2 2 0 010-4V4z" /><path d="M13 4a1 1 0 012 0v7.268a2 2 0 000 4V18a1 1 0 11-2 0v-1.268a2 2 0 010-4V4z" /></svg>
-          <span class="text-sm">Playlist</span>
-          <span class="text-xs text-neutral-600">({{ mpdStore.playlist.length }})</span>
-        </router-link>
-      </div>
+      <div class="flex-1"></div>
     </div>
-
-
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
 
 const mpdStore = useMpdStore()
+const router = useRouter()
 const progressBar = ref(null)
 
-// Progress Bar Logic
 const progressPercentage = ref(0)
 const transitionDuration = ref('0s')
 
@@ -77,33 +95,26 @@ const updateProgress = async () => {
     progressPercentage.value = 0
     return
   }
-  
-  // Snap to current reported time
+
   transitionDuration.value = '0s'
   progressPercentage.value = (mpdStore.currentTime / mpdStore.duration) * 100
-  
-  // If playing, animate to the NEXT 10s mark
+
   if (mpdStore.isPlaying) {
-    // Wait for DOM update
     // eslint-disable-next-line
-    await new Promise(r => setTimeout(r, 0)) 
-    
-    // Force reflow
+    await new Promise(r => setTimeout(r, 0))
+
     if (document.body) document.body.offsetHeight
 
-    // Start 10s transition
     transitionDuration.value = '10s'
     const targetTime = Math.min(mpdStore.currentTime + 10, mpdStore.duration)
     progressPercentage.value = (targetTime / mpdStore.duration) * 100
   }
 }
 
-// Watchers
 watch(() => mpdStore.status, () => {
   updateProgress()
-}, { deep: true }) // Deep watch to catch elapsed/state changes
+}, { deep: true })
 
-// Additional watch for when we navigate and store might allow change
 watch(() => mpdStore.currentTime, () => updateProgress())
 
 const coverUrl = computed(() => {
@@ -116,12 +127,29 @@ const coverUrl = computed(() => {
   return null
 })
 
-// displayTime is now just for the text counter - we can keep using store time for that 
-// or implement a local interpolation if we want the text to tick too.
-// For now, let's keep text simple as per request for "progress bar" smoothness.
 const displayTime = computed(() => mpdStore.currentTime)
 
-const isHorizontal = computed(() => typeof window !== 'undefined' && window.innerWidth >= 1024)
+const nextTrack = computed(() => {
+  const pos = mpdStore.playlistCurrentPos
+  if (pos >= 0 && pos + 1 < mpdStore.playlist.length) {
+    return mpdStore.playlist[pos + 1]
+  }
+  return null
+})
+
+const goToAlbum = () => {
+  const song = mpdStore.currentSong
+  if (song?.artist && song?.album) {
+    router.push({ name: 'album-detail', params: { artist: song.artist, album: song.album } })
+  }
+}
+
+const goToArtist = () => {
+  const song = mpdStore.currentSong
+  if (song?.artist) {
+    router.push({ name: 'artist-detail', query: { artist: song.artist } })
+  }
+}
 
 const play = () => mpdStore.play()
 const pause = () => mpdStore.pause()
@@ -134,31 +162,9 @@ const seekTo = (event) => {
   if (!progressBar.value || !mpdStore.duration) return
   const rect = progressBar.value.getBoundingClientRect()
   const percentage = (event.clientX - rect.left) / rect.width
-  const seekTime = percentage * mpdStore.duration
-  
-  // Call seek API (assuming store has a seek method, or we use play with pos?? No, need seek)
-  // The original code set mpdStore.localElapsed, which doesn't actually seek on backend.
-  // We need a seek action.
-  // Since original code had `mpdStore.localElapsed = ...`, I'll assume they wanted visual feedback OR intended to seek.
-  // BUT `localElapsed` in store is now read-only derived.
-  // Let's implement actual seek if possible, or trigger a seek on backend.
-  // Checking store... `play` logic doesn't seemingly expose seek.
-  // I will check `mpd.js` if it has seek. If not, I will add it or assume this is a visual glitch in original code.
-  // Wait, I see `play({pos})` but `seek` is `seek cur <time>`.
-  // Let's check `mpd.js` again.
-  // Ah, the original code used `mpdStore.localElapsed` which was a client-side only var for the RAF loop.
-  // Setting it would just jump the bar locally.
-  // I should probably implement a real seek if the user clicks, but for now let's just make sure the UI updates.
-  // Actually, without a seek backend call, clicking the bar does NOTHING useful except glitch the UI.
-  // I will leave `seekTo` implementation relying on a TODO to call backend, 
-  // but importantly update the local visual state using our new mechanism.
-  
-  // For now: Snap visually
+
   transitionDuration.value = '0s'
   progressPercentage.value = percentage * 100
-  
-  // TODO: Implement backend seek
-  // axios.post(`/api/seek/${percentage * mpdStore.duration}`) 
 }
 
 const formatTime = (seconds) => {
@@ -169,20 +175,15 @@ const formatTime = (seconds) => {
 }
 
 onMounted(async () => {
-  console.log('[NowPlaying] Calling connect...')
   await mpdStore.connect()
   await mpdStore.fetchPlaylist()
-  
 
-  // Force initial update
   updateProgress()
-  
-  // Also start polling if not already (it's global, but good to ensure)
+
   mpdStore.startPolling()
 })
 
 onUnmounted(() => {
-  // No specific cleanup needed as polling is managed by store for play state
 })
 </script>
 

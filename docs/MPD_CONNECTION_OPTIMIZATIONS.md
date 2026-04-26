@@ -161,7 +161,7 @@ err := MPDCircuitBreaker.Execute(ctx, func() error {
 └─────────┼────────────────┼────────────────┼──────┘
           │                │                │
 ┌─────────┴────────────────┴────────────────┴──────┐
-│              MPD Client Layer                     │
+│              Sloppy Disk Layer                     │
 │  ┌──────────────────┐  ┌──────────────────┐      │
 │  │ Command Pool     │  │ Single Idle      │      │
 │  │ (max 10 conns)   │  │ Client           │      │

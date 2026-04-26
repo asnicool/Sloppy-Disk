@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,10 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"mpd-client-modern/internal/config"
-	"mpd-client-modern/internal/metadata"
-	"mpd-client-modern/internal/models"
-	"mpd-client-modern/internal/mpd"
+	"sloppy-disk/internal/config"
+	"sloppy-disk/internal/metadata"
+	"sloppy-disk/internal/models"
 )
 
 type candidateKey struct {
@@ -31,7 +31,7 @@ type Manager struct {
 
 func NewManager() *Manager {
 	return &Manager{
-		client:     &http.Client{Timeout: 30 * time.Second},
+		client:     &http.Client{Timeout: 60 * time.Second},
 		candidates: make(map[candidateKey][]models.CoverArtCandidate),
 	}
 }
@@ -80,29 +80,60 @@ func (m *Manager) removeFromOrder(key candidateKey) {
 }
 
 func (m *Manager) ApplyCover(albumPath string, imageURL string) error {
+	log.Printf("[CoverArt Manager] ApplyCover called: albumPath=%s, imageURL=%s", albumPath, imageURL)
+
+	// Validate inputs
+	if albumPath == "" {
+		err := fmt.Errorf("albumPath cannot be empty")
+		log.Printf("[CoverArt Manager] Validation error: %v", err)
+		return err
+	}
+	if imageURL == "" {
+		err := fmt.Errorf("imageURL cannot be empty")
+		log.Printf("[CoverArt Manager] Validation error: %v", err)
+		return err
+	}
+
 	cfg := config.Get()
+	log.Printf("[CoverArt Manager] Config: MusicRoot=%s, CoverArtRoot=%s", cfg.MusicRoot, cfg.CoverArtRoot)
+
+	// Validate configuration
+	if cfg.MusicRoot == "" && cfg.CoverArtRoot == "" {
+		err := fmt.Errorf("both MusicRoot and CoverArtRoot are not configured")
+		log.Printf("[CoverArt Manager] Configuration error: %v", err)
+		return err
+	}
 
 	// 1. Download image
+	log.Printf("[CoverArt Manager] Downloading image from: %s", imageURL)
 	resp, err := m.client.Get(imageURL)
 	if err != nil {
-		return err
+		log.Printf("[CoverArt Manager] Failed to download image: %v", err)
+		return fmt.Errorf("failed to download image: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download image: %s", resp.Status)
+		err := fmt.Errorf("failed to download image: %s", resp.Status)
+		log.Printf("[CoverArt Manager] Bad response status: %v", err)
+		return err
 	}
+	log.Printf("[CoverArt Manager] Image downloaded successfully, Content-Type: %s", resp.Header.Get("Content-Type"))
 
 	// 2. Determine destination path
 	var destDir string
 	if cfg.CoverArtRoot != "" {
 		destDir = filepath.Join(cfg.CoverArtRoot, albumPath)
+		log.Printf("[CoverArt Manager] Using CoverArtRoot: %s", destDir)
 	} else {
 		destDir = filepath.Join(cfg.MusicRoot, albumPath)
+		log.Printf("[CoverArt Manager] Using MusicRoot: %s", destDir)
 	}
 
+	log.Printf("[CoverArt Manager] Creating directory: %s", destDir)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
-		return err
+		log.Printf("[CoverArt Manager] Failed to create directory: %v", err)
+		return fmt.Errorf("failed to create directory %s: %w", destDir, err)
 	}
 
 	// 3. Detect extension from Content-Type
@@ -117,38 +148,90 @@ func (m *Manager) ApplyCover(albumPath string, imageURL string) error {
 		ext = ".gif"
 	}
 
-	destPath := filepath.Join(destDir, "folder"+ext)
+	// Use capital "Folder" as the standard filename
+	destPath := filepath.Join(destDir, "Folder"+ext)
+	log.Printf("[CoverArt Manager] Destination path: %s", destPath)
+
+	// Remove any existing folder/Folder cover art files (case-insensitive cleanup)
+	entries, err := os.ReadDir(destDir)
+	if err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			nameLower := strings.ToLower(entry.Name())
+			// Check if this is a folder.jpg/Folder.jpg variant with any supported extension
+			if strings.HasPrefix(nameLower, "folder.") {
+				oldExt := strings.ToLower(filepath.Ext(entry.Name()))
+				if oldExt == ".jpg" || oldExt == ".jpeg" || oldExt == ".png" || oldExt == ".webp" || oldExt == ".gif" {
+					oldPath := filepath.Join(destDir, entry.Name())
+					log.Printf("[CoverArt Manager] Removing old cover art: %s", oldPath)
+					if err := os.Remove(oldPath); err != nil {
+						log.Printf("[CoverArt Manager] Warning: failed to remove %s: %v", oldPath, err)
+					}
+				}
+			}
+		}
+	}
 
 	f, err := os.Create(destPath)
 	if err != nil {
-		return err
+		log.Printf("[CoverArt Manager] Failed to create file: %v", err)
+		return fmt.Errorf("failed to create file %s: %w", destPath, err)
 	}
 	defer f.Close()
 
-	_, err = io.Copy(f, resp.Body)
+	written, err := io.Copy(f, resp.Body)
 	if err != nil {
-		return err
+		log.Printf("[CoverArt Manager] Failed to write file: %v", err)
+		return fmt.Errorf("failed to write file: %w", err)
 	}
+	log.Printf("[CoverArt Manager] File written successfully: %d bytes", written)
 
-	// 4. Trigger MPD update for this path
-	client := mpd.GetClient()
-	_, err = client.SendCommand(fmt.Sprintf("update %q", albumPath))
-	return err
+	log.Printf("[CoverArt Manager] Cover art applied successfully")
+
+	return nil
 }
 
 func (m *Manager) SaveUploadedCover(albumPath string, reader io.Reader, contentType string) error {
+	log.Printf("[CoverArt Manager] SaveUploadedCover called: albumPath=%s, contentType=%s", albumPath, contentType)
+
+	// Validate inputs
+	if albumPath == "" {
+		err := fmt.Errorf("albumPath cannot be empty")
+		log.Printf("[CoverArt Manager] Validation error: %v", err)
+		return err
+	}
+	if reader == nil {
+		err := fmt.Errorf("reader cannot be nil")
+		log.Printf("[CoverArt Manager] Validation error: %v", err)
+		return err
+	}
+
 	cfg := config.Get()
+	log.Printf("[CoverArt Manager] Config: MusicRoot=%s, CoverArtRoot=%s", cfg.MusicRoot, cfg.CoverArtRoot)
+
+	// Validate configuration
+	if cfg.MusicRoot == "" && cfg.CoverArtRoot == "" {
+		err := fmt.Errorf("both MusicRoot and CoverArtRoot are not configured")
+		log.Printf("[CoverArt Manager] Configuration error: %v", err)
+		return err
+	}
 
 	// 1. Determine destination path
 	var destDir string
 	if cfg.CoverArtRoot != "" {
 		destDir = filepath.Join(cfg.CoverArtRoot, albumPath)
+		log.Printf("[CoverArt Manager] Using CoverArtRoot: %s", destDir)
 	} else {
 		destDir = filepath.Join(cfg.MusicRoot, albumPath)
+		log.Printf("[CoverArt Manager] Using MusicRoot: %s", destDir)
 	}
 
+	log.Printf("[CoverArt Manager] Creating directory: %s", destDir)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
-		return err
+		log.Printf("[CoverArt Manager] Failed to create directory: %v", err)
+		return fmt.Errorf("failed to create directory %s: %w", destDir, err)
 	}
 
 	// 2. Detect extension from Content-Type
@@ -162,23 +245,49 @@ func (m *Manager) SaveUploadedCover(albumPath string, reader io.Reader, contentT
 		ext = ".gif"
 	}
 
-	destPath := filepath.Join(destDir, "folder"+ext)
+	// Use capital "Folder" as the standard filename
+	destPath := filepath.Join(destDir, "Folder"+ext)
+	log.Printf("[CoverArt Manager] Destination path: %s", destPath)
+
+	// Remove any existing folder/Folder cover art files (case-insensitive cleanup)
+	entries, err := os.ReadDir(destDir)
+	if err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			nameLower := strings.ToLower(entry.Name())
+			// Check if this is a folder.jpg/Folder.jpg variant with any supported extension
+			if strings.HasPrefix(nameLower, "folder.") {
+				oldExt := strings.ToLower(filepath.Ext(entry.Name()))
+				if oldExt == ".jpg" || oldExt == ".jpeg" || oldExt == ".png" || oldExt == ".webp" || oldExt == ".gif" {
+					oldPath := filepath.Join(destDir, entry.Name())
+					log.Printf("[CoverArt Manager] Removing old cover art: %s", oldPath)
+					if err := os.Remove(oldPath); err != nil {
+						log.Printf("[CoverArt Manager] Warning: failed to remove %s: %v", oldPath, err)
+					}
+				}
+			}
+		}
+	}
 
 	f, err := os.Create(destPath)
 	if err != nil {
-		return err
+		log.Printf("[CoverArt Manager] Failed to create file: %v", err)
+		return fmt.Errorf("failed to create file %s: %w", destPath, err)
 	}
 	defer f.Close()
 
-	_, err = io.Copy(f, reader)
+	written, err := io.Copy(f, reader)
 	if err != nil {
-		return err
+		log.Printf("[CoverArt Manager] Failed to write file: %v", err)
+		return fmt.Errorf("failed to write file: %w", err)
 	}
+	log.Printf("[CoverArt Manager] File written successfully: %d bytes", written)
 
-	// 3. Trigger MPD update for this path
-	client := mpd.GetClient()
-	_, err = client.SendCommand(fmt.Sprintf("update %q", albumPath))
-	return err
+	log.Printf("[CoverArt Manager] Uploaded cover art saved successfully")
+
+	return nil
 }
 
 // FindImage searches for a cover art image for the given album path.

@@ -3,8 +3,9 @@ package mpd
 import (
 	"fmt"
 	"testing"
+	"time"
 
-	"mpd-client-modern/internal/config"
+	"sloppy-disk/internal/config"
 )
 
 func TestPathMapping(t *testing.T) {
@@ -90,5 +91,51 @@ func TestExecute(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("Execute failed: %v", err)
+	}
+}
+
+func TestConcurrency(t *testing.T) {
+	client := GetPool()
+	const concurrentRequests = 10
+	errChan := make(chan error, concurrentRequests)
+
+	for i := 0; i < concurrentRequests; i++ {
+		go func() {
+			err := client.Execute(func(conn *Connection) error {
+				// Simulate some work
+				time.Sleep(100 * time.Millisecond)
+				conn.isConnected = true
+				return nil
+			})
+			errChan <- err
+		}()
+	}
+
+	for i := 0; i < concurrentRequests; i++ {
+		err := <-errChan
+		if err != nil {
+			t.Errorf("Concurrent request %d failed: %v", i, err)
+		}
+	}
+}
+
+func TestExecuteRetry(t *testing.T) {
+	client := GetPool()
+
+	attempts := 0
+	err := client.Execute(func(conn *Connection) error {
+		attempts++
+		if attempts == 1 {
+			return fmt.Errorf("EOF") // Simulate connection error
+		}
+		conn.isConnected = true
+		return nil
+	})
+
+	if err != nil {
+		t.Errorf("Execute failed: %v", err)
+	}
+	if attempts != 2 {
+		t.Errorf("Expected 2 attempts, got %d", attempts)
 	}
 }

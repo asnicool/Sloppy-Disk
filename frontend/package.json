@@ -1,7 +1,7 @@
 {
-  "name": "mpd-client-frontend",
+  "name": "sloppy-disk",
   "version": "1.0.0",
-  "description": "Modern MPD Web Client - Lightweight Frontend",
+  "description": "Sloppy Disk - Lightweight music player for MPD",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "axios": "^1.13.2",
+    "fuse.js": "^7.1.0",
     "lodash-es": "^4.17.22",
     "pinia": "^3.0.4",
     "sortablejs": "^1.15.6",

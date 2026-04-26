@@ -2,39 +2,40 @@
   <div class="space-y-6">
     <h1 class="text-3xl font-bold text-white">Albums</h1>
     <div class="flex justify-between items-center">
-      <div class="flex space-x-2">
-        <button 
-          @click="sortMode = 'name'" 
-          :class="{ 'bg-blue-600': sortMode === 'name', 'bg-neutral-700': sortMode !== 'name' }"
-          class="px-4 py-2 rounded-lg text-white"
-        >
-          Sort by Name
-        </button>
-        <button 
-          @click="sortMode = 'date'" 
-          :class="{ 'bg-blue-600': sortMode === 'date', 'bg-neutral-700': sortMode !== 'date' }"
-          class="px-4 py-2 rounded-lg text-white"
-        >
-          Sort by Date
-        </button>
-        <button 
-          @click="sortMode = 'random'; if(sortMode === 'random') loadAlbums()" 
-          :class="{ 'bg-blue-600': sortMode === 'random', 'bg-neutral-700': sortMode !== 'random' }"
-          class="px-4 py-2 rounded-lg text-white"
-        >
-          Random
-        </button>
-      </div>
-      <button 
-        v-if="sortMode === 'random'"
-        @click="loadAlbums"
-        class="px-4 py-2 bg-neutral-700 text-white rounded-lg hover:bg-neutral-600 flex items-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-        Refresh
-      </button>
+<div class="flex space-x-2">
+  <button 
+    @click="sortMode = 'name'" 
+    :class="{ 'bg-blue-600': sortMode === 'name', 'bg-neutral-700': sortMode !== 'name' }"
+    class="px-4 py-2 rounded-lg text-white"
+  >
+    Sort by Name
+  </button>
+  <button 
+    @click="sortMode = 'date'" 
+    :class="{ 'bg-blue-600': sortMode === 'date', 'bg-neutral-700': sortMode !== 'date' }"
+    class="px-4 py-2 rounded-lg text-white"
+  >
+    Sort by Date
+  </button>
+  <button 
+    @click="sortMode = 'random'" 
+    :class="{ 'bg-blue-600': sortMode === 'random', 'bg-neutral-700': sortMode !== 'random' }"
+    class="px-4 py-2 rounded-lg text-white"
+  >
+    Random
+  </button>
+  <button 
+    v-if="sortMode === 'random'"
+    @click="refreshRandom()"
+    class="px-4 py-2 bg-neutral-700 text-white rounded-lg hover:bg-neutral-600 flex items-center gap-2"
+  >
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+    Refresh
+  </button>
+</div>
+      
     </div>
     <div v-if="loading" class="text-neutral-400">Loading albums...</div>
     <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
@@ -106,7 +107,24 @@ const hasMore = ref(false)
 const itemsPerPage = 36
 const sortMode = ref('random') // 'name', 'date', 'random'
 
-const loadAlbums = async () => {
+const getCacheKey = () => `${sortMode.value}-${currentPage.value}`
+
+const loadAlbums = async (forceRefresh = false) => {
+  const cacheKey = getCacheKey()
+
+  if (!forceRefresh) {
+    const cached = mpdStore.getAlbumListCache(cacheKey)
+    if (cached) {
+      console.log('[AlbumsView] Using cached albums:', cacheKey)
+      albums.value = cached.albums
+      totalAlbums.value = cached.totalAlbums
+      totalPages.value = cached.totalPages
+      hasMore.value = cached.hasMore
+      loading.value = false
+      return
+    }
+  }
+
   loading.value = true
   try {
     if (sortMode.value === 'date' || sortMode.value === 'name') {
@@ -131,9 +149,20 @@ const loadAlbums = async () => {
         hasMore.value = false
       }
     }
+
+    mpdStore.setAlbumListCache(cacheKey, {
+      albums: albums.value,
+      totalAlbums: totalAlbums.value,
+      totalPages: totalPages.value,
+      hasMore: hasMore.value
+    })
   } finally {
     loading.value = false
   }
+}
+
+const refreshRandom = () => {
+  loadAlbums(true)
 }
 
 const nextPage = async () => {

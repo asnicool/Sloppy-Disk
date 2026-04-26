@@ -1,10 +1,11 @@
 <template>
-  <div class="bg-gray-800 border-t border-gray-700 p-3 shadow-2xl z-50">
+  <div class="bg-gray-800 border-t border-gray-700 shadow-2xl z-50">
     <div class="max-w-7xl mx-auto">
-      <div class="flex items-center gap-4">
+      <!-- Desktop Layout: Single row -->
+      <div class="hidden md:flex items-center gap-4 p-3">
         <!-- Song Info & CoverArt -->
         <div class="flex items-center space-x-3 overflow-hidden min-w-0 flex-grow-[2]">
-          <router-link 
+          <router-link
             to="/nowplaying"
             class="w-12 h-12 bg-neutral-700 rounded flex-shrink-0 flex items-center justify-center overflow-hidden border border-neutral-600 hover:border-blue-500 transition-colors group relative"
             title="Now Playing"
@@ -20,70 +21,44 @@
               </svg>
             </div>
           </router-link>
-          
+
           <div class="min-w-0 flex-1 leading-tight">
             <h3 class="text-sm font-bold text-white truncate cursor-default mb-0.5">
               <span v-if="currentSong?.track" class="text-gray-400 mr-1.5 font-mono text-xs">{{ formatTrack(currentSong.track) }}</span>
               {{ currentSong?.title || 'No song playing' }}
             </h3>
-            
-            <!-- Progress bar for small screens (underlying song info) -->
-            <div class="md:hidden w-full bg-gray-700/50 rounded-full h-1 relative mb-0.5 cursor-pointer" @click="seekToSmall($event)">
-              <div 
-                class="bg-blue-500 h-full rounded-full transition-all ease-linear relative overflow-visible"
-                :style="{ width: `${progressPercentage}%`, transitionDuration: transitionDuration }"
-              >
-                <div class="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full shadow-lg scale-0 group-hover:scale-100 transition-transform"></div>
-              </div>
-            </div>
-            
-            <!-- Artist & Album info (2 lines on small screens) -->
-            <div class="flex flex-col md:flex-row md:items-center text-xs text-gray-400 space-y-0.5 md:space-y-0 md:space-x-1 whitespace-nowrap overflow-hidden">
-              <span 
+
+            <!-- Artist & Album info -->
+            <div class="flex items-center text-xs text-gray-400 space-x-1 whitespace-nowrap overflow-hidden">
+              <span
                 @click="searchBy(currentSong?.artist)"
-                class="hover:text-blue-400 cursor-pointer transition-colors max-w-full truncate"
+                class="hover:text-blue-400 cursor-pointer transition-colors truncate"
               >{{ currentSong?.artist || 'Unknown Artist' }}</span>
-              <div class="hidden md:inline text-gray-600">•</div>
-              <div class="md:hidden flex items-center space-x-1">
-                <span 
-                  @click="searchBy(currentSong?.date)"
-                  v-if="currentSong?.date"
-                  class="hover:text-blue-400 cursor-pointer transition-colors"
-                  title="Search by Date"
-                >{{ currentSong.date }}</span>
-                <span v-if="currentSong?.date" class="text-gray-600">-</span>
-                <span 
-                  @click="searchBy(currentSong?.album)"
-                  v-if="currentSong?.album"
-                  class="hover:text-blue-400 cursor-pointer transition-colors truncate"
-                >{{ currentSong.album }}</span>
-              </div>
-              <div class="hidden md:flex items-center md:space-x-1">
-                <span 
-                  @click="searchBy(currentSong?.date)"
-                  v-if="currentSong?.date"
-                  class="hover:text-blue-400 cursor-pointer transition-colors"
-                  title="Search by Date"
-                >{{ currentSong.date }}</span>
-                <span v-if="currentSong?.date" class="text-gray-600">-</span>
-                <span 
-                  @click="searchBy(currentSong?.album)"
-                  v-if="currentSong?.album"
-                  class="hover:text-blue-400 cursor-pointer transition-colors truncate"
-                >{{ currentSong.album }}</span>
-              </div>
+              <span class="text-gray-600">•</span>
+              <span
+                @click="searchBy(currentSong?.date)"
+                v-if="currentSong?.date"
+                class="hover:text-blue-400 cursor-pointer transition-colors"
+                title="Search by Date"
+              >{{ currentSong.date }}</span>
+              <span v-if="currentSong?.date" class="text-gray-600">-</span>
+              <span
+                @click="searchBy(currentSong?.album)"
+                v-if="currentSong?.album"
+                class="hover:text-blue-400 cursor-pointer transition-colors truncate"
+              >{{ currentSong.album }}</span>
             </div>
           </div>
         </div>
 
         <!-- Progress (Inlined for compactness) -->
-        <div class="hidden md:flex flex-col flex-grow-[3] min-w-[200px] px-2">
+        <div class="flex flex-col flex-grow-[3] min-w-[200px] px-2">
           <div class="flex items-center justify-between text-[10px] text-gray-500 mb-0.5 px-0.5">
             <span>{{ formatTime(currentTime) }}</span>
             <span>{{ formatTime(duration) }}</span>
           </div>
           <div class="w-full bg-gray-700/50 rounded-full h-1 relative group cursor-pointer">
-            <div 
+            <div
               class="bg-blue-500 h-full rounded-full transition-all ease-linear relative overflow-visible"
               :style="{ width: `${progressPercentage}%`, transitionDuration: transitionDuration }"
             >
@@ -94,8 +69,8 @@
 
         <!-- Controls -->
         <div class="flex items-center space-x-1 shrink-0">
-          <button 
-            @click="previous" 
+          <button
+            @click="previous"
             class="p-2 rounded-full hover:bg-gray-700/50 text-gray-300 transition-colors"
             title="Previous"
           >
@@ -104,8 +79,8 @@
             </svg>
           </button>
 
-          <button 
-            @click="isPlaying ? pause() : play()" 
+          <button
+            @click="isPlaying ? pause() : play()"
             class="p-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all active:scale-95"
           >
             <svg v-if="isPlaying" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -116,8 +91,8 @@
             </svg>
           </button>
 
-          <button 
-            @click="next" 
+          <button
+            @click="next"
             class="p-2 rounded-full hover:bg-gray-700/50 text-gray-300 transition-colors"
             title="Next"
           >
@@ -127,8 +102,8 @@
           </button>
         </div>
 
-        <!-- Volume Toggle (only show if volume is supported by MPD) -->
-        <div v-if="volumeSupported" class="relative group shrink-0 ml-1">
+        <!-- Volume Toggle (only show if volume is supported by MPD) - Hidden on small screens, shown in top bar -->
+        <div v-if="volumeSupported" class="relative group shrink-0 ml-1 hidden md:block">
           <button 
             @click="showVolumeSlider = !showVolumeSlider"
             class="p-2 rounded-full hover:bg-gray-700/50 transition-colors"
@@ -161,23 +136,141 @@
         </div>
       </div>
 
+      <!-- Mobile Layout: Same height as cover art, content split into 2 lines -->
+      <div :class="[
+        'md:hidden flex items-stretch gap-3',
+        playlist.length > 0 ? 'px-3 pt-3 pb-2' : 'p-3'
+      ]">
+        <!-- Cover Art (left side, full height) -->
+        <router-link
+          to="/nowplaying"
+          class="w-12 h-12 bg-neutral-700 rounded flex-shrink-0 flex items-center justify-center overflow-hidden border border-neutral-600 hover:border-blue-500 transition-colors group relative"
+          title="Now Playing"
+        >
+          <img v-if="coverUrl" :src="coverUrl" class="w-full h-full object-cover group-hover:opacity-75 transition-opacity" />
+          <svg v-else class="w-6 h-6 text-neutral-500" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.369 4.369 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" />
+          </svg>
+          <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </div>
+        </router-link>
+
+        <!-- Right side: Split into 2 lines -->
+        <div class="flex-1 flex flex-col justify-between min-w-0">
+          <!-- Line 1: Track number, title, artist, with progress bar underneath -->
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-baseline gap-x-1 truncate">
+              <h3 class="text-sm font-bold text-white truncate cursor-default leading-tight">
+                <span v-if="currentSong?.track" class="text-gray-400 mr-1 font-mono text-xs">{{ formatTrack(currentSong.track) }}</span>
+                {{ currentSong?.title || 'No song playing' }}
+              </h3>
+              <span
+                @click="searchBy(currentSong?.artist)"
+                class="text-xs text-gray-400 hover:text-blue-400 cursor-pointer transition-colors truncate"
+              >{{ currentSong?.artist || 'Unknown Artist' }}</span>
+            </div>
+            <!-- Progress bar -->
+            <div class="w-full bg-gray-700/50 rounded-full h-1 relative mt-1 cursor-pointer" @click="seekToSmall($event)">
+              <div
+                class="bg-blue-500 h-full rounded-full transition-all ease-linear relative overflow-visible"
+                :style="{ width: `${progressPercentage}%`, transitionDuration: transitionDuration }"
+              >
+                <div class="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full shadow-lg scale-0 group-hover:scale-100 transition-transform"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Line 2: Album - Date + Controls -->
+          <div class="flex items-center gap-2 min-w-0">
+            <!-- Album - Date -->
+            <div class="flex items-center text-xs text-gray-400 space-x-1 truncate min-w-0">
+              <span
+                @click="searchBy(currentSong?.album)"
+                v-if="currentSong?.album"
+                class="hover:text-blue-400 cursor-pointer transition-colors truncate"
+              >{{ currentSong.album }}</span>
+              <span v-if="currentSong?.date" class="text-gray-600 flex-shrink-0">-</span>
+              <span
+                @click="searchBy(currentSong?.date)"
+                v-if="currentSong?.date"
+                class="hover:text-blue-400 cursor-pointer transition-colors truncate"
+              >{{ currentSong.date }}</span>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex items-center gap-0.5 flex-shrink-0">
+              <button
+                @click="previous"
+                class="p-1 rounded hover:bg-gray-700/50 text-gray-300 transition-colors"
+                title="Previous"
+              >
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z" />
+                </svg>
+              </button>
+
+              <button
+                @click="isPlaying ? pause() : play()"
+                class="p-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all active:scale-95"
+              >
+                <svg v-if="isPlaying" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+                <svg v-else class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                </svg>
+              </button>
+
+              <button
+                @click="next"
+                class="p-1 rounded hover:bg-gray-700/50 text-gray-300 transition-colors"
+                title="Next"
+              >
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798l-5.445-3.63z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Playlist Visualization (Condensed) -->
-      <div v-if="playlist.length > 0" class="mt-2.5 flex items-center justify-center gap-1 overflow-x-auto py-1 px-1 scrollbar-hide">
-        <div 
-          v-for="(item, index) in playlist" 
-          :key="`${item.path}-${index}`"
-          class="rounded-full flex-shrink-0 transition-all duration-500"
-          :class="{
-            'scale-125 border border-white z-10': index === playlistCurrentPos,
-            'opacity-40 scale-75': Math.abs(index - playlistCurrentPos) > 10
-          }"
-          :style="{
-            width: getDotSize(item.duration),
-            height: getDotSize(item.duration),
-            backgroundColor: index === playlistCurrentPos ? '#ffffff' : (index < playlistCurrentPos ? '#4b5563' : getAlbumColor(item.album, item.artist)),
-          }"
-          :title="`${item.artist} - ${item.title} (${item.album})`"
-        ></div>
+      <div v-if="playlist.length > 0" class="mt-1 flex items-center justify-center overflow-x-auto py-0.5 px-1 scrollbar-hide relative">
+        <div class="flex items-center">
+          <template v-for="(item, index) in playlist" :key="`${item.path}-${index}`">
+            <!-- Connecting line for same album -->
+            <div
+              v-if="index > 0 && isSameAlbum(playlist[index - 1], item)"
+              class="h-px flex-shrink-0"
+              :style="{
+                width: getLineWidth(playlist[index - 1]?.duration, item.duration),
+                marginLeft: getLineMargin(playlist[index - 1]?.duration),
+                backgroundColor: index <= playlistCurrentPos ? '#4b5563' : getAlbumColor(item.album, item.artist),
+                opacity: Math.abs(index - playlistCurrentPos) > 10 ? 0.3 : 0.6
+              }"
+            ></div>
+            <!-- Dot -->
+            <div
+              class="rounded-full flex-shrink-0 transition-all duration-500"
+              :class="{
+                'scale-125 border border-white z-10': index === playlistCurrentPos,
+                'opacity-40 scale-75': Math.abs(index - playlistCurrentPos) > 10
+              }"
+              :style="{
+                width: getDotSize(item.duration),
+                height: getDotSize(item.duration),
+                marginLeft: index > 0 && !isSameAlbum(playlist[index - 1], item) ? getSpacingMargin(playlist[index - 1]?.duration) : undefined,
+                backgroundColor: index === playlistCurrentPos ? '#ffffff' : (index < playlistCurrentPos ? '#4b5563' : getAlbumColor(item.album, item.artist)),
+              }"
+              :title="`${item.artist} - ${item.title} (${item.album}) [${formatTime(item.duration)}]`"
+            ></div>
+          </template>
+        </div>
       </div>
     </div>
   </div>
@@ -192,6 +285,12 @@ const router = useRouter()
 const mpdStore = useMpdStore()
 
 const showVolumeSlider = ref(false)
+const isSmallScreen = ref(false)
+
+// Check screen size on mount and resize
+const checkScreenSize = () => {
+  isSmallScreen.value = window.innerWidth < 768
+}
 
 // Computed properties
 const currentSong = computed(() => mpdStore.currentSong)
@@ -281,12 +380,15 @@ watch([currentTime, isPlaying, duration], () => {
 
 // Lifecycle
 onMounted(() => {
+  checkScreenSize()
+  window.addEventListener('resize', checkScreenSize)
   mpdStore.startPolling()
   mpdStore.fetchPlaylist()
   updateProgress()
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', checkScreenSize)
   mpdStore.stopPolling()
 })
 
@@ -299,9 +401,68 @@ const formatTime = (seconds) => {
 }
 
 const getDotSize = (seconds) => {
-  if (!seconds) return '5px'
-  const size = 3 + Math.log(seconds + 1) * 1.2
-  return `${size}px`
+  if (!seconds) return isSmallScreen.value ? '4px' : '5px'
+  const minutes = seconds / 60
+
+  // Small screens: 4px, 7px, 10px
+  if (isSmallScreen.value) {
+    if (minutes < 3) return '4px'      // Small: < 3 minutes
+    if (minutes < 9) return '7px'      // Medium: 3-9 minutes
+    return '10px'                       // Large: >= 9 minutes
+  }
+
+  // Large screens: 5px, 8px, 12px
+  if (minutes < 3) return '5px'        // Small: < 3 minutes
+  if (minutes < 9) return '8px'        // Medium: 3-9 minutes
+  return '12px'                         // Large: >= 9 minutes
+}
+
+const getLineWidth = (prevDuration, currDuration) => {
+  // Line goes from center to center of dots
+  // Width is the full spacing between centers
+  const targetSpacing = isSmallScreen.value ? 10 : 12
+  return `${targetSpacing}px`
+}
+
+const getLineMargin = (prevDuration) => {
+  // Position line to start from center of previous dot
+  // Use negative margin to overlap the previous dot by half its width
+  const prevSize = parseDotSize(prevDuration)
+  const targetSpacing = isSmallScreen.value ? 10 : 12
+  // Negative margin pulls line left to start at center of prev dot
+  // Line extends targetSpacing to reach center of next dot
+  return `${-(prevSize / 2)}px`
+}
+
+const getSpacingMargin = (prevDuration) => {
+  // Calculate margin needed to maintain constant center-to-center spacing
+  const prevSize = parseDotSize(prevDuration)
+  const targetSpacing = isSmallScreen.value ? 10 : 12 // Responsive spacing
+  return `${targetSpacing - prevSize}px`
+}
+
+const parseDotSize = (seconds) => {
+  if (!seconds) return isSmallScreen.value ? 4 : 5
+  const minutes = seconds / 60
+
+  if (isSmallScreen.value) {
+    if (minutes < 3) return 4
+    if (minutes < 9) return 7
+    return 10
+  }
+
+  if (minutes < 3) return 5
+  if (minutes < 9) return 8
+  return 12
+}
+
+const isSameAlbum = (item1, item2) => {
+  // Check if two items are from the same album (album name only)
+  // This connects all songs from the same album regardless of artist variations
+  const album1 = (item1.album || '').toLowerCase().trim()
+  const album2 = (item2.album || '').toLowerCase().trim()
+  // Both albums must be non-empty AND identical to connect
+  return album1 !== '' && album2 !== '' && album1 === album2
 }
 
 const getAlbumColor = (album, artist) => {

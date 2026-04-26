@@ -6,13 +6,17 @@
     ghost-class="opacity-50"
     drag-class="cursor-grabbing"
     @change="handleChange"
+    @start="onDragStart"
+    @end="onDragEnd"
     class="flex flex-col gap-1 min-h-[20px]"
   >
-    <template #item="{ element }">
+    <template #item="{ element, index }">
       <div 
-        class="flex items-center gap-2 p-2 rounded cursor-grab active:cursor-grabbing group transition-colors"
+        class="flex items-center gap-2 p-2 rounded cursor-grab active:cursor-grabbing group transition-colors select-none"
         :class="getTrackClass(element)"
-        @dblclick="playTrack(element.pos)"
+        v-on="getTrackHandlers(element)"
+        :data-track-pos="element.pos"
+        :data-track-index="index"
       >
         <!-- Track Number / Playing Indicator -->
         <div class="w-6 flex items-center justify-center">
@@ -39,7 +43,7 @@
         <!-- Unplayed Indicator Dot -->
         <div 
           v-if="!element.isPlayed && !element.isCurrentTrack" 
-          class="w-1.5 h-1.5 rounded-full bg-neutral-600"
+          :class="getDotSizeClass(element.dotSize)"
           title="Not played yet"
         ></div>
       </div>
@@ -48,9 +52,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import draggable from 'vuedraggable'
 import { useMpdStore } from '@/stores/mpd'
+import { useDoubleTapSimple } from '@/composables/useDoubleTap'
 
 const props = defineProps({
   tracks: {
@@ -67,8 +72,12 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['track-move', 'track-remove'])
+const emit = defineEmits(['track-move', 'track-remove', 'drag-start', 'drag-end', 'dragging'])
 const mpdStore = useMpdStore()
+const { handlers: doubleTapHandlers, reset: resetDoubleTap } = useDoubleTapSimple({ delay: 300 })
+const isDraggingTrack = ref(false)
+const lastTrackDragEnd = ref(0)
+const TRACK_DRAG_COOLDOWN = 800
 
 const getTrackClass = (element) => {
   if (element.isCurrentTrack) {
@@ -80,8 +89,27 @@ const getTrackClass = (element) => {
   return 'bg-neutral-800/50 hover:bg-neutral-700/80'
 }
 
+const getDotSizeClass = (size) => {
+  const sizeMap = {
+    small: 'dot-size-small',
+    medium: 'dot-size-medium',
+    large: 'dot-size-large'
+  }
+  return sizeMap[size] || 'dot-size-small'
+}
+
 const playTrack = (pos) => {
+  const timeSinceDrag = Date.now() - lastTrackDragEnd.value
+  if (timeSinceDrag < TRACK_DRAG_COOLDOWN) {
+    console.log('[QueueTrackList] Blocked track play — within drag cooldown (%dms)', timeSinceDrag)
+    return
+  }
   mpdStore.playTrack(pos)
+}
+
+const getTrackHandlers = (element) => {
+  if (isDraggingTrack.value) return {}
+  return doubleTapHandlers(() => playTrack(element.pos))
 }
 
 const handleChange = (event) => {
@@ -96,5 +124,31 @@ const handleChange = (event) => {
     const globalTarget = props.groupStartPos + newIndex
     emit('track-move', { from: element.pos, to: globalTarget })
   }
+}
+
+const onDragStart = (event) => {
+  isDraggingTrack.value = true
+  resetDoubleTap()
+  emit('drag-start')
+  const el = event?.item
+  if (el) {
+    const trackPos = el.getAttribute('data-track-pos')
+    const trackIndex = el.getAttribute('data-track-index')
+    if (trackPos !== null) {
+      emit('dragging', { 
+        type: 'track', 
+        pos: parseInt(trackPos, 10), 
+        groupStartPos: props.groupStartPos,
+        index: trackIndex ? parseInt(trackIndex, 10) : -1
+      })
+    }
+  }
+}
+
+const onDragEnd = () => {
+  isDraggingTrack.value = false
+  lastTrackDragEnd.value = Date.now()
+  resetDoubleTap()
+  emit('drag-end')
 }
 </script>

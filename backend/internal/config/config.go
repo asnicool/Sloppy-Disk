@@ -24,12 +24,51 @@ type Config struct {
 	RandomAlbumCount      int    `json:"randomAlbumCount"`
 	EnableActivityRefresh bool   `json:"enableActivityRefresh"`
 	// Metadata provider settings
-	// Metadata provider settings
 	MusicBrainzEnabled bool `json:"musicBrainzEnabled"`
 	DiscogsEnabled     bool `json:"discogsEnabled"`
 	FreeDBEnabled      bool `json:"freeDbEnabled"` // Deprecated: Use GNUDbEnabled
 	GNUDbEnabled       bool `json:"gnuDbEnabled"`
 	AlbumArtEnabled    bool `json:"albumArtEnabled"`
+	// N50 HIFI Component settings
+	N50Enabled       bool   `json:"n50Enabled"`
+	N50Host          string `json:"n50Host"`
+	N50Port          int    `json:"n50Port"`
+	N50Input         string `json:"n50Input"`         // Input source (e.g., "DigitalIn1", "DigitalIn2", "MusicServer")
+	N50AutoControl   bool   `json:"n50AutoControl"`   // Auto check/change input before playback
+	N50IgnoreOnStart bool   `json:"n50IgnoreOnStart"` // Option to ignore N50 for starting playback
+}
+
+// ConfigDTO is used for partial updates and handling optional fields
+type ConfigDTO struct {
+	MPDHost               *string `json:"mpdHost"`
+	MPDPort               *int    `json:"mpdPort"`
+	Host                  *string `json:"host"` // Support old naming
+	Port                  *int    `json:"port"` // Support old naming
+	MPDPassword           *string `json:"mpdPassword"`
+	MusicRoot             *string `json:"musicRoot"`
+	CoverArtRoot          *string `json:"coverArtRoot"`
+	CoverArtBaseUrl       *string `json:"coverArtBaseUrl"`
+	DiscogsToken          *string `json:"discogsToken"`
+	DiscogsKey            *string `json:"discogsKey"`
+	DiscogsSecret         *string `json:"discogsSecret"`
+	AlbumArtAPIKey        *string `json:"albumArtApiKey"`
+	RsyncRemoteTarget     *string `json:"rsyncRemoteTarget"`
+	RsyncOptions          *string `json:"rsyncOptions"`
+	RandomAlbumCount      *int    `json:"randomAlbumCount"`
+	EnableActivityRefresh *bool   `json:"enableActivityRefresh"`
+	// Metadata provider settings
+	MusicBrainzEnabled *bool `json:"musicBrainzEnabled"`
+	DiscogsEnabled     *bool `json:"discogsEnabled"`
+	FreeDBEnabled      *bool `json:"freeDbEnabled"`
+	GNUDbEnabled       *bool `json:"gnuDbEnabled"`
+	AlbumArtEnabled    *bool `json:"albumArtEnabled"`
+	// N50 HIFI Component settings
+	N50Enabled       *bool   `json:"n50Enabled"`
+	N50Host          *string `json:"n50Host"`
+	N50Port          *int    `json:"n50Port"`
+	N50Input         *string `json:"n50Input"`
+	N50AutoControl   *bool   `json:"n50AutoControl"`
+	N50IgnoreOnStart *bool   `json:"n50IgnoreOnStart"`
 }
 
 var (
@@ -65,14 +104,48 @@ func Load() error {
 				MPDPort:               6600,
 				RandomAlbumCount:      30,
 				EnableActivityRefresh: true,
+				MusicBrainzEnabled:    true,
+				DiscogsEnabled:        true,
+				GNUDbEnabled:          true,
+				AlbumArtEnabled:       true,
+				N50Enabled:            false,
+				N50Port:               8102,
+				N50Input:              "DigitalIn1",
+				N50AutoControl:        true,
+				N50IgnoreOnStart:      false,
 			}
 			return saveLocked()
 		}
 		return err
 	}
 
-	instance = &Config{}
-	return json.Unmarshal(data, instance)
+	// Unmarshal into DTO to handle legacy fields and partial updates
+	var dto ConfigDTO
+	if err := json.Unmarshal(data, &dto); err != nil {
+		return err
+	}
+
+	// Initialize with defaults
+	instance = &Config{
+		MPDHost:               "192.168.1.90",
+		MPDPort:               6600,
+		RandomAlbumCount:      30,
+		EnableActivityRefresh: true,
+		MusicBrainzEnabled:    true,
+		DiscogsEnabled:        true,
+		GNUDbEnabled:          true,
+		AlbumArtEnabled:       true,
+		N50Enabled:            false,
+		N50Port:               8102,
+		N50Input:              "DigitalIn1",
+		N50AutoControl:        true,
+		N50IgnoreOnStart:      false,
+	}
+
+	// Apply DTO values
+	instance.ApplyDTO(&dto)
+
+	return nil
 }
 
 func Save(c *Config) error {
@@ -100,115 +173,96 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// Custom UnmarshalJSON to handle both old and new field names
-func (c *Config) UnmarshalJSON(data []byte) error {
-	// Create a temporary struct with both naming conventions
-	var temp struct {
-		MPDHost               *string `json:"mpdHost"`
-		MPDPort               *int    `json:"mpdPort"`
-		Host                  *string `json:"host"` // Support old naming
-		Port                  *int    `json:"port"` // Support old naming
-		MPDPassword           *string `json:"mpdPassword"`
-		MusicRoot             *string `json:"musicRoot"`
-		CoverArtRoot          *string `json:"coverArtRoot"`
-		CoverArtBaseUrl       *string `json:"coverArtBaseUrl"`
-		DiscogsToken          *string `json:"discogsToken"`
-		DiscogsKey            *string `json:"discogsKey"`
-		DiscogsSecret         *string `json:"discogsSecret"`
-		AlbumArtAPIKey        *string `json:"albumArtApiKey"`
-		RsyncRemoteTarget     *string `json:"rsyncRemoteTarget"`
-		RsyncOptions          *string `json:"rsyncOptions"`
-		RandomAlbumCount      *int    `json:"randomAlbumCount"`
-		EnableActivityRefresh *bool   `json:"enableActivityRefresh"`
-		// Metadata provider settings
-		MusicBrainzEnabled *bool `json:"musicBrainzEnabled"`
-		DiscogsEnabled     *bool `json:"discogsEnabled"`
-		FreeDBEnabled      *bool `json:"freeDbEnabled"`
-		GNUDbEnabled       *bool `json:"gnuDbEnabled"`
-		AlbumArtEnabled    *bool `json:"albumArtEnabled"`
+// ApplyDTO updates the configuration with values from the provided DTO
+// Only non-nil fields in the DTO are applied
+func (c *Config) ApplyDTO(dto *ConfigDTO) {
+	if dto.MPDHost != nil {
+		c.MPDHost = *dto.MPDHost
+	} else if dto.Host != nil {
+		c.MPDHost = *dto.Host
 	}
 
-	if err := json.Unmarshal(data, &temp); err != nil {
-		return err
+	if dto.MPDPort != nil {
+		c.MPDPort = *dto.MPDPort
+	} else if dto.Port != nil {
+		c.MPDPort = *dto.Port
 	}
 
-	// Only set values if they were provided in the JSON (not nil)
-	if temp.MPDHost != nil {
-		c.MPDHost = *temp.MPDHost
-	} else if temp.Host != nil {
-		c.MPDHost = *temp.Host
+	if dto.MPDPassword != nil {
+		c.MPDPassword = *dto.MPDPassword
+	}
+	if dto.MusicRoot != nil {
+		c.MusicRoot = *dto.MusicRoot
+	}
+	if dto.CoverArtRoot != nil {
+		c.CoverArtRoot = *dto.CoverArtRoot
+	}
+	if dto.CoverArtBaseUrl != nil {
+		c.CoverArtBaseUrl = *dto.CoverArtBaseUrl
+	}
+	if dto.DiscogsToken != nil {
+		c.DiscogsToken = *dto.DiscogsToken
+	}
+	if dto.DiscogsKey != nil {
+		c.DiscogsKey = *dto.DiscogsKey
+	}
+	if dto.DiscogsSecret != nil {
+		c.DiscogsSecret = *dto.DiscogsSecret
+	}
+	if dto.AlbumArtAPIKey != nil {
+		c.AlbumArtAPIKey = *dto.AlbumArtAPIKey
+	}
+	if dto.RsyncRemoteTarget != nil {
+		c.RsyncRemoteTarget = *dto.RsyncRemoteTarget
+	}
+	if dto.RsyncOptions != nil {
+		c.RsyncOptions = *dto.RsyncOptions
+	}
+	if dto.RandomAlbumCount != nil {
+		c.RandomAlbumCount = *dto.RandomAlbumCount
+	}
+	if dto.EnableActivityRefresh != nil {
+		c.EnableActivityRefresh = *dto.EnableActivityRefresh
 	}
 
-	if temp.MPDPort != nil {
-		c.MPDPort = *temp.MPDPort
-	} else if temp.Port != nil {
-		c.MPDPort = *temp.Port
+	// Metadata settings
+	if dto.MusicBrainzEnabled != nil {
+		c.MusicBrainzEnabled = *dto.MusicBrainzEnabled
+	}
+	if dto.DiscogsEnabled != nil {
+		c.DiscogsEnabled = *dto.DiscogsEnabled
 	}
 
-	if temp.MPDPassword != nil {
-		c.MPDPassword = *temp.MPDPassword
+	// Handle GNUDb/FreeDB backward compatibility
+	if dto.GNUDbEnabled != nil {
+		c.GNUDbEnabled = *dto.GNUDbEnabled
+	} else if dto.FreeDBEnabled != nil {
+		c.GNUDbEnabled = *dto.FreeDBEnabled
 	}
-	if temp.MusicRoot != nil {
-		c.MusicRoot = *temp.MusicRoot
-	}
-	if temp.CoverArtRoot != nil {
-		c.CoverArtRoot = *temp.CoverArtRoot
-	}
-	if temp.CoverArtBaseUrl != nil {
-		c.CoverArtBaseUrl = *temp.CoverArtBaseUrl
-	}
-	if temp.DiscogsToken != nil {
-		c.DiscogsToken = *temp.DiscogsToken
-	}
-	if temp.DiscogsKey != nil {
-		c.DiscogsKey = *temp.DiscogsKey
-	}
-	if temp.DiscogsSecret != nil {
-		c.DiscogsSecret = *temp.DiscogsSecret
-	}
-	if temp.AlbumArtAPIKey != nil {
-		c.AlbumArtAPIKey = *temp.AlbumArtAPIKey
-	}
-	if temp.RsyncRemoteTarget != nil {
-		c.RsyncRemoteTarget = *temp.RsyncRemoteTarget
-	}
-	if temp.RsyncOptions != nil {
-		c.RsyncOptions = *temp.RsyncOptions
-	}
-	if temp.RandomAlbumCount != nil {
-		c.RandomAlbumCount = *temp.RandomAlbumCount
-	}
-	if temp.EnableActivityRefresh != nil {
-		c.EnableActivityRefresh = *temp.EnableActivityRefresh
-	}
-	// Set metadata provider defaults
-	if temp.MusicBrainzEnabled != nil {
-		c.MusicBrainzEnabled = *temp.MusicBrainzEnabled
-	} else {
-		c.MusicBrainzEnabled = true // Default to enabled
-	}
-	if temp.DiscogsEnabled != nil {
-		c.DiscogsEnabled = *temp.DiscogsEnabled
-	} else {
-		c.DiscogsEnabled = true // Default to enabled
-	}
-	// Map FreeDBEnabled to GNUDbEnabled for backward compatibility
-	if temp.GNUDbEnabled != nil {
-		c.GNUDbEnabled = *temp.GNUDbEnabled
-	} else if temp.FreeDBEnabled != nil {
-		c.GNUDbEnabled = *temp.FreeDBEnabled
-	} else {
-		c.GNUDbEnabled = true // Default to enabled
-	}
-
-	// Keep FreeDBEnabled synced just in case, though it's deprecated
+	// Always keep FreeDBEnabled synced
 	c.FreeDBEnabled = c.GNUDbEnabled
 
-	if temp.AlbumArtEnabled != nil {
-		c.AlbumArtEnabled = *temp.AlbumArtEnabled
-	} else {
-		c.AlbumArtEnabled = true // Default to enabled
+	if dto.AlbumArtEnabled != nil {
+		c.AlbumArtEnabled = *dto.AlbumArtEnabled
 	}
 
-	return nil
+	// N50 settings
+	if dto.N50Enabled != nil {
+		c.N50Enabled = *dto.N50Enabled
+	}
+	if dto.N50Host != nil {
+		c.N50Host = *dto.N50Host
+	}
+	if dto.N50Port != nil {
+		c.N50Port = *dto.N50Port
+	}
+	if dto.N50Input != nil {
+		c.N50Input = *dto.N50Input
+	}
+	if dto.N50AutoControl != nil {
+		c.N50AutoControl = *dto.N50AutoControl
+	}
+	if dto.N50IgnoreOnStart != nil {
+		c.N50IgnoreOnStart = *dto.N50IgnoreOnStart
+	}
 }

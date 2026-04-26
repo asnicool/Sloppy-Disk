@@ -8,8 +8,8 @@ import (
 	"sync"
 	"unicode"
 
-	"mpd-client-modern/internal/config"
-	"mpd-client-modern/internal/models"
+	"sloppy-disk/internal/config"
+	"sloppy-disk/internal/models"
 )
 
 // Aggregator handles searching across multiple metadata providers

@@ -6,7 +6,7 @@ class AlbumBatchLoader {
     this.timer = null
     this.initialCount = 0
     this.MAX_INITIAL = 6
-    this.BATCH_SIZE = 6
+    this.BATCH_SIZE = 3  // Reduced from 6 to 3 for better responsiveness and to ensure status/playlist availability
     this.DEBOUNCE_MS = 100
     this.pendingRequests = new Map() // key -> {resolve, reject}
     this.isProcessing = false

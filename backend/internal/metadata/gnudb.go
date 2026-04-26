@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"mpd-client-modern/internal/models"
+	"sloppy-disk/internal/models"
 )
 
 const (
 	gnuDBAPIURL    = "https://gnudb.gnudb.org/~cddb/cddb.cgi"
-	gnuDBUserAgent = "mpd-client-modern/1.0"
+	gnuDBUserAgent = "sloppy-disk/1.0"
 )
 
 // GNUDbProvider implements the Provider interface for GNUDb

@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-8">
-    <h1 class="text-3xl font-bold text-white">Library Management</h1>
+    <h1 class="text-3xl font-bold text-white">Configuration</h1>
 
     <!-- Quick Stats -->
     <div class="bg-neutral-800 rounded-lg p-6 border border-neutral-700">
@@ -29,21 +29,119 @@
       </div>
     </div>
 
-    <!-- Quick Links -->
-    <section class="bg-neutral-800 rounded-lg p-6 flex items-center justify-between border border-neutral-700">
-      <div>
-        <h2 class="text-xl font-semibold text-white">Advanced Search</h2>
-        <p class="text-neutral-400 text-sm mt-1">Search categories like artists, albums, songs, and genres with real-time results.</p>
+    <!-- N50 HIFI Control Section -->
+    <section class="bg-neutral-800 rounded-lg p-6 border border-neutral-700">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold text-white">N50 HIFI Component Control</h2>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-neutral-400">Enabled</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" v-model="config.n50Enabled" class="sr-only peer" @change="saveConfig">
+            <div class="w-11 h-6 bg-neutral-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+          </label>
+        </div>
       </div>
-      <router-link 
-        to="/search" 
-        class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition-colors flex items-center space-x-2"
-      >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <span>Open Search</span>
-      </router-link>
+      
+      <div v-if="config.n50Enabled">
+        <!-- Status -->
+        <div class="mb-4 p-4 bg-neutral-700/50 rounded-lg">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-neutral-400">Status:</span>
+            <span :class="n50Status?.isConnected ? 'text-green-400' : 'text-red-400'">
+              {{ n50Status?.isConnected ? 'Connected' : 'Disconnected' }}
+            </span>
+          </div>
+          <div v-if="n50Status?.isConnected" class="flex items-center justify-between mb-2">
+            <span class="text-neutral-400">Power:</span>
+            <span class="text-white">{{ n50Status?.powerStatus || 'Unknown' }}</span>
+          </div>
+          <div v-if="n50Status?.isConnected" class="flex items-center justify-between">
+            <span class="text-neutral-400">Current Input:</span>
+            <span class="text-white">{{ n50Status?.currentInput || 'Unknown' }}</span>
+          </div>
+        </div>
+
+        <!-- Power Controls -->
+        <div class="flex gap-2 mb-4">
+          <button 
+            @click="n50PowerOn" 
+            :disabled="!n50Status?.isConnected || n50Status?.powerStatus === 'Powered up'"
+            class="bg-green-600 hover:bg-green-500 disabled:bg-neutral-600 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+          >
+            Power On
+          </button>
+          <button 
+            @click="n50PowerOff" 
+            :disabled="!n50Status?.isConnected || n50Status?.powerStatus !== 'Powered up'"
+            class="bg-red-600 hover:bg-red-500 disabled:bg-neutral-600 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+          >
+            Standby
+          </button>
+          <button 
+            @click="refreshN50Status" 
+            :disabled="isLoadingN50"
+            class="bg-neutral-600 hover:bg-neutral-500 disabled:bg-neutral-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+          >
+            Refresh
+          </button>
+        </div>
+
+        <!-- Input Selection -->
+        <div v-if="n50Inputs.length > 0" class="mb-4">
+          <label class="block text-neutral-400 text-sm mb-2">Input Selection</label>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="input in n50Inputs"
+              :key="input"
+              @click="n50SetInput(input)"
+              :class="[
+                'px-3 py-1 rounded text-sm transition-colors',
+                n50Status?.currentInput === getInputDisplayName(input) 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-neutral-700 text-neutral-300 hover:bg-neutral-600'
+              ]"
+            >
+              {{ getInputDisplayName(input) }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Configuration -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-neutral-700">
+          <div>
+            <label class="block text-neutral-400 text-sm mb-1">N50 Host</label>
+            <input v-model="config.n50Host" type="text" placeholder="192.168.1.70" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none text-sm">
+          </div>
+          <div>
+            <label class="block text-neutral-400 text-sm mb-1">N50 Port</label>
+            <input v-model.number="config.n50Port" type="number" placeholder="8102" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none text-sm">
+          </div>
+          <div>
+            <label class="block text-neutral-400 text-sm mb-1">Default Input</label>
+            <select v-model="config.n50Input" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none text-sm">
+              <option value="DigitalIn1">Digital In 1</option>
+              <option value="DigitalIn2">Digital In 2</option>
+              <option value="DigitalInUSB">Digital In USB</option>
+              <option value="MusicServer">Music Server</option>
+              <option value="InternetRadio">Internet Radio</option>
+              <option value="USB">USB</option>
+              <option value="BTAudio">BT Audio</option>
+              <option value="AirJam">Air Jam</option>
+              <option value="iPod">iPod</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex gap-4 mt-4">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input v-model="config.n50AutoControl" type="checkbox" class="w-4 h-4 text-blue-600 bg-neutral-700 border-neutral-600 rounded focus:ring-blue-500">
+            <span class="text-neutral-400 text-sm">Auto Control</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input v-model="config.n50IgnoreOnStart" type="checkbox" class="w-4 h-4 text-blue-600 bg-neutral-700 border-neutral-600 rounded focus:ring-blue-500">
+            <span class="text-neutral-400 text-sm">Ignore on Start</span>
+          </label>
+        </div>
+      </div>
     </section>
 
     <!-- Rsync Sync Section -->
@@ -98,7 +196,7 @@
             <div class="w-8 h-8 bg-orange-600 rounded flex items-center justify-center text-xs font-bold">DC</div>
             <div>
               <p class="text-white font-medium">Discogs</p>
-              <p class="text-neutral-400 text-xs">Requires API token</p>
+              <p class="text-neutral-400 text-xs">Requires API credentials</p>
             </div>
           </div>
           <label class="relative inline-flex items-center cursor-pointer">
@@ -110,12 +208,12 @@
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 bg-green-600 rounded flex items-center justify-center text-xs font-bold">FD</div>
             <div>
-              <p class="text-white font-medium">FreeDB</p>
+              <p class="text-white font-medium">FreeDB / GNUDb</p>
               <p class="text-neutral-400 text-xs">Good for older CDs</p>
             </div>
           </div>
           <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" v-model="config.freeDbEnabled" class="sr-only peer">
+            <input type="checkbox" v-model="config.gnuDbEnabled" class="sr-only peer">
             <div class="w-11 h-6 bg-neutral-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
           </label>
         </div>
@@ -123,7 +221,7 @@
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 bg-purple-600 rounded flex items-center justify-center text-xs font-bold">AA</div>
             <div>
-              <p class="text-white font-medium">AlbumArt.digital</p>
+              <p class="text-white font-medium">AlbumArt</p>
               <p class="text-neutral-400 text-xs">Cover art focused</p>
             </div>
           </div>
@@ -157,20 +255,32 @@
             <input v-model="config.coverArtRoot" type="text" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none">
           </div>
           <div>
-            <label class="block text-neutral-400 text-sm mb-1">Discogs Token</label>
-            <input v-model="config.discogsToken" type="password" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none">
+            <label class="block text-neutral-400 text-sm mb-1">Cover Art Base URL</label>
+            <input v-model="config.coverArtBaseUrl" type="text" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none">
           </div>
           <div>
-            <label class="block text-neutral-400 text-sm mb-1">AlbumArt.digital API Key</label>
-            <input v-model="config.albumArtApiKey" type="password" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none">
+            <label class="block text-neutral-400 text-sm mb-1">Random Album Count</label>
+            <input v-model.number="config.randomAlbumCount" type="number" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-neutral-400 text-sm mb-1">Discogs Key</label>
+            <input v-model="config.discogsKey" type="password" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-neutral-400 text-sm mb-1">Discogs Secret</label>
+            <input v-model="config.discogsSecret" type="password" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none">
           </div>
           <div>
             <label class="block text-neutral-400 text-sm mb-1">Rsync Target</label>
             <input v-model="config.rsyncRemoteTarget" type="text" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none" placeholder="user@host:/path">
           </div>
-          <div class="flex items-center space-x-3 pt-6">
+          <div>
+            <label class="block text-neutral-400 text-sm mb-1">Rsync Options</label>
+            <input v-model="config.rsyncOptions" type="text" class="w-full bg-neutral-700 text-white rounded px-3 py-2 border border-neutral-600 focus:border-blue-500 outline-none" placeholder="--delete --progress">
+          </div>
+          <div class="flex items-center space-x-3">
             <input v-model="config.enableActivityRefresh" type="checkbox" id="enableActivityRefresh" class="w-4 h-4 text-blue-600 bg-neutral-700 border-neutral-600 rounded focus:ring-blue-500 focus:ring-offset-neutral-800">
-            <label for="enableActivityRefresh" class="text-neutral-400 text-sm font-medium">Enable Activity-Based Refresh (Mobile Batteries)</label>
+            <label for="enableActivityRefresh" class="text-neutral-400 text-sm font-medium">Enable Activity-Based Refresh</label>
           </div>
         </div>
         <div class="flex justify-end">
@@ -252,25 +362,37 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useMpdStore } from '@/stores/mpd'
+import { useMpdStore } from '@/stores/mpdStore'
 
 const mpdStore = useMpdStore()
 
 const status = computed(() => mpdStore.status)
+const n50Status = computed(() => mpdStore.n50Status)
+const n50Inputs = computed(() => mpdStore.n50Inputs)
+const isLoadingN50 = computed(() => mpdStore.isLoadingN50)
 const syncStatus = ref(null)
 const config = ref({
   mpdHost: '',
   mpdPort: 6600,
   musicRoot: '',
   coverArtRoot: '',
-  discogsToken: '',
-  albumArtApiKey: '',
+  coverArtBaseUrl: '',
+  discogsKey: '',
+  discogsSecret: '',
   rsyncRemoteTarget: '',
+  rsyncOptions: '',
+  randomAlbumCount: 30,
   enableActivityRefresh: true,
   musicBrainzEnabled: true,
   discogsEnabled: true,
-  freeDbEnabled: true,
-  albumArtEnabled: true
+  gnuDbEnabled: true,
+  albumArtEnabled: true,
+  n50Enabled: false,
+  n50Host: '',
+  n50Port: 8102,
+  n50Input: 'DigitalIn1',
+  n50AutoControl: true,
+  n50IgnoreOnStart: false
 })
 
 let syncInterval = null
@@ -290,21 +412,66 @@ const triggerSync = async () => {
 const loadConfig = async () => {
   const response = await mpdStore.getConfig()
   if (response.success) {
-    config.value = { ...response.data }
+    config.value = { 
+      ...config.value,
+      ...response.data 
+    }
   }
 }
 
 const saveConfig = async () => {
   const response = await mpdStore.updateConfig(config.value)
   if (response.success) {
-    alert('Configuration saved successfully')
+    // Show a temporary success message instead of alert
+    const btn = document.querySelector('button[type="submit"]')
+    const originalText = btn.textContent
+    btn.textContent = 'Saved!'
+    btn.classList.add('bg-green-700')
+    setTimeout(() => {
+      btn.textContent = originalText
+      btn.classList.remove('bg-green-700')
+    }, 1500)
   }
+}
+
+const getInputDisplayName = (input) => {
+  const names = {
+    'DigitalIn1': 'Digital In 1',
+    'DigitalIn2': 'Digital In 2',
+    'DigitalInUSB': 'Digital In USB',
+    'MusicServer': 'Music Server',
+    'InternetRadio': 'Internet Radio',
+    'USB': 'USB',
+    'BTAudio': 'BT Audio',
+    'AirJam': 'Air Jam',
+    'iPod': 'iPod'
+  }
+  return names[input] || input
+}
+
+const refreshN50Status = async () => {
+  await mpdStore.fetchN50Status()
+}
+
+const n50PowerOn = async () => {
+  await mpdStore.n50PowerOn()
+}
+
+const n50PowerOff = async () => {
+  await mpdStore.n50PowerOff()
+}
+
+const n50SetInput = async (input) => {
+  await mpdStore.n50SetInput(input)
 }
 
 onMounted(() => {
   loadConfig()
   fetchSyncStatus()
   syncInterval = setInterval(fetchSyncStatus, 2000)
+  // Fetch N50 status and inputs
+  mpdStore.fetchN50Status()
+  mpdStore.fetchN50Inputs()
 })
 
 onUnmounted(() => {

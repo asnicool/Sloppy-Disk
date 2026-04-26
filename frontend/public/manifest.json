@@ -1,7 +1,7 @@
 {
-    "name": "MPD Client",
-    "short_name": "MPD",
-    "description": "Modern MPD Web Client",
+    "name": "Sloppy Disk",
+    "short_name": "Sloppy",
+    "description": "Sloppy Disk - Music Player for MPD",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#111827",

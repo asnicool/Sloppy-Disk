@@ -1,7 +1,7 @@
 package mpd
 
 import (
-	"mpd-client-modern/internal/models"
+	"sloppy-disk/internal/models"
 	"strings"
 	"testing"
 )

@@ -18,10 +18,19 @@
           <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.369 4.369 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" />
         </svg>
         <button 
-          @click="showCoverPicker = true"
+          @click="handleCoverClick"
           class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
         >
-          <span class="text-white text-sm font-medium">Change Cover</span>
+          <div class="flex flex-col items-center space-y-2">
+            <span class="text-white text-sm font-medium">Cover Options</span>
+            <div class="flex items-center space-x-2 text-[10px] font-bold uppercase tracking-wider text-white/40">
+                <span class="px-1.5 py-0.5 border border-white/20 rounded">Click</span>
+                <span>Picker</span>
+                <span class="text-white/20">•</span>
+                <span class="px-1.5 py-0.5 border border-white/20 rounded">Double</span>
+                <span>Zoom</span>
+            </div>
+          </div>
         </button>
       </div>
       
@@ -58,25 +67,15 @@
 
         <div class="flex flex-wrap gap-3 mt-auto">
              <button @click="handleAction('play')" class="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded transition-colors font-medium">
-                <svg v-if="hasSelection" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-1.664a1 1 0 000-1.664l-3-1.664z" clip-rule="evenodd" />
-                </svg>
+                <span v-html="QueueActionIcons.play"></span>
                 <span>{{ hasSelection ? 'Play Selected' : 'Play Album' }}</span>
              </button>
              <button @click="handleAction('next')" class="flex items-center space-x-2 bg-neutral-700 hover:bg-neutral-600 text-white px-4 py-2 rounded transition-colors font-medium">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                 </svg>
+                <span v-html="QueueActionIcons.next"></span>
                 <span>Play Next</span>
              </button>
              <button @click="handleAction('append')" class="flex items-center space-x-2 bg-neutral-700 hover:bg-neutral-600 text-white px-4 py-2 rounded transition-colors font-medium">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <span v-html="QueueActionIcons.append"></span>
                 <span>Add to Queue</span>
              </button>
              
@@ -113,6 +112,7 @@
           <tr 
             v-for="(track, index) in tracks" 
             :key="track.path" 
+            :data-track-path="track.path"
             @click="toggleSelection(track)"
             class="transition-colors group cursor-pointer"
             :class="[
@@ -142,7 +142,15 @@
             </td>
             <td class="px-4 py-2 text-right text-sm" :class="{ 'opacity-50': hasSelection && !isTrackSelected(track) }">{{ formatDuration(track.duration) }}</td>
             <td class="px-4 py-2 text-sm" :class="{ 'text-white': !hasSelection || isTrackSelected(track) }">
-              <div class="truncate" :title="track.title">{{ track.title }}</div>
+              <div class="flex items-center space-x-2 truncate" :title="track.title">
+                <span class="truncate flex-1">{{ track.title }}</span>
+                <span 
+                  class="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0"
+                  :class="getFileExtensionClass(track.path)"
+                >
+                  {{ getFileExtension(track.path) }}
+                </span>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -157,6 +165,7 @@
        :album-path="albumPath"
        :track-count="albumDetails?.trackCount"
        :duration="albumDetails?.duration"
+       :library-tracks="tracks"
        @close="showMetadataModal = false"
        @applied="handleMetadataApplied"
        @cover-updated="handleCoverUpdated"
@@ -173,53 +182,104 @@
               <div
                 v-for="(cover, idx) in coverCandidates"
                 :key="idx"
-                class="aspect-square relative group cursor-pointer rounded-lg overflow-hidden bg-neutral-900 border border-neutral-800 hover:border-blue-500 transition-colors"
+                :class="[
+                  'aspect-square relative group cursor-pointer rounded-lg overflow-hidden bg-neutral-900 border transition-all duration-300',
+                  applyingCover === cover.url ? 'border-green-500 ring-2 ring-green-500' : 'border-neutral-800 hover:border-blue-500'
+                ]"
                 @click="selectCover(cover)"
               >
-                <img :src="cover.thumbnail || cover.url" class="w-full h-full object-cover" />
+                <img :src="cover.thumbnail || cover.url" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                 
-                <!-- Dimension Badge -->
-                <div v-if="cover.width && cover.height" class="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/70 backdrop-blur-md rounded text-[9px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                  {{ cover.width }}x{{ cover.height }}
+                <!-- Dimension Legend (Always Visible) -->
+                <div v-if="cover.width && cover.height" class="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-black/80 backdrop-blur-md border-t border-white/10 text-[10px] font-bold text-white flex justify-between items-center z-10">
+                  <span class="opacity-50 uppercase tracking-tighter text-[8px]">Dimensions</span>
+                  <span class="text-blue-400">{{ cover.width }}<span class="text-white/40 mx-0.5">x</span>{{ cover.height }}</span>
                 </div>
 
-                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <span class="text-xs font-bold text-white uppercase tracking-wider">Select</span>
+                <!-- Loading State -->
+                <div v-if="applyingCover === cover.url" class="absolute inset-0 bg-green-600/80 flex items-center justify-center backdrop-blur-[2px]">
+                  <svg class="animate-spin h-8 w-8 text-white" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                </div>
+
+                <!-- Hover State (only show when not loading) -->
+                <div v-else class="absolute inset-0 bg-blue-600/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
+                  <div class="bg-blue-600 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg transform -translate-y-2 group-hover:translate-y-0 transition-transform">
+                    Set Cover
+                  </div>
                 </div>
               </div>
         </div>
       </div>
     </BaseModal>
 
-    <!-- Confirmation Modal -->
-    <BaseConfirmModal
-      v-model="showConfirmModal"
-      title="Update Cover Art"
-      message="Set this as album cover art? This will update the folder image on disk."
-      confirm-label="Set Cover"
-      :loading="applyingCover"
-      @confirm="handleConfirmCover"
-      @cancel="showConfirmModal = false"
+    <!-- Full Screen Cover Overlay -->
+    <Transition
+      enter-active-class="transition duration-300 ease-out"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition duration-200 ease-in"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
     >
-      <div v-if="pendingCover" class="aspect-square w-32 mx-auto rounded-lg overflow-hidden border border-neutral-700 shadow-xl">
-        <img :src="pendingCover.url" class="w-full h-full object-cover" />
+      <div 
+        v-if="showFullScreenCover" 
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 md:p-8"
+        @click="showFullScreenCover = false"
+      >
+        <div class="relative max-w-5xl w-full h-full flex items-center justify-center">
+          <img 
+            :src="albumDetails?.coverUrl + (coverBust ? '?t=' + coverBust : '')" 
+            :alt="albumName"
+            class="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
+            @click.stop
+          />
+          
+          <!-- Close Button -->
+          <button 
+            @click="showFullScreenCover = false"
+            class="absolute top-0 right-0 m-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          <!-- Info Overlay -->
+          <div class="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/80 to-transparent text-white rounded-b-lg">
+            <h2 class="text-3xl font-bold">{{ albumName }}</h2>
+            <p class="text-xl text-neutral-300">{{ artistName }}</p>
+          </div>
+        </div>
       </div>
-    </BaseConfirmModal>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMpdStore } from '@/stores/mpd'
+import { useQueueActions, QueueActionIcons } from '@/composables/useQueueActions'
 import BaseToast from '@/components/BaseToast.vue'
 import BaseModal from '@/components/BaseModal.vue'
-import BaseConfirmModal from '@/components/BaseConfirmModal.vue'
 import MetadataSearchModal from '@/components/MetadataSearchModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const mpdStore = useMpdStore()
+
+// Use shared queue actions composable for selection management
+const {
+  hasSelection,
+  isTrackSelected,
+  getSelectionOrder,
+  toggleSelection,
+  clearSelection,
+  handleAction: handleQueueAction
+} = useQueueActions()
 
 const artistName = computed(() => route.params.artist)
 const albumName = computed(() => route.params.album)
@@ -236,16 +296,33 @@ const showCoverPicker = ref(false)
 const fetchingCovers = ref(false)
 const coverCandidates = ref([])
 const coverBust = ref(0)
+const showFullScreenCover = ref(false)
+const applyingCover = ref(null) // Stores the URL of cover being applied
 
-// Confirmation Modal
-const showConfirmModal = ref(false)
-const pendingCover = ref(null)
-const applyingCover = ref(false)
-
-// Toast Notification
+// Toast notification state
 const showToast = ref(false)
 const toastMessage = ref('')
 const toastType = ref('success')
+
+// Click handling for cover art
+let clickCount = 0
+let clickTimer = null
+
+const handleCoverClick = () => {
+    clickCount++
+    if (clickCount === 1) {
+        clickTimer = setTimeout(() => {
+            if (clickCount === 1) {
+                showCoverPicker.value = true
+            }
+            clickCount = 0
+        }, 250) // 250ms is standard for double click detection
+    } else if (clickCount === 2) {
+        clearTimeout(clickTimer)
+        showFullScreenCover.value = true
+        clickCount = 0
+    }
+}
 
 const showNotification = (message, type = 'success') => {
     toastMessage.value = message
@@ -253,56 +330,30 @@ const showNotification = (message, type = 'success') => {
     showToast.value = true
 }
 
-// Selection State
-const selectedTracks = ref(new Set())
-const selectionOrder = ref([])
-
-const hasSelection = computed(() => selectedTracks.value.size > 0)
-
-const isTrackSelected = (track) => selectedTracks.value.has(track.path)
-
-const getSelectionOrder = (track) => {
-    return selectionOrder.value.indexOf(track.path) + 1
-}
-
-const toggleSelection = (track) => {
-    if (selectedTracks.value.has(track.path)) {
-        selectedTracks.value.delete(track.path)
-        selectionOrder.value = selectionOrder.value.filter(path => path !== track.path)
-    } else {
-        selectedTracks.value.add(track.path)
-        selectionOrder.value.push(track.path)
-    }
-}
-
-const clearSelection = () => {
-    selectedTracks.value.clear()
-    selectionOrder.value = []
-}
-
-const getTargetTracks = () => {
-    if (hasSelection.value) {
-        return selectionOrder.value
-    }
-    return tracks.value.map(t => t.path)
-}
-
 const handleAction = async (mode) => {
-    const tracksToAdd = getTargetTracks()
-    if (tracksToAdd.length === 0) return
-    
+  // If no explicit track selection, delegate to backend album endpoint
+  // which can handle album-level adds more efficiently
+  if (!hasSelection.value && albumDetails.value) {
     try {
-        await mpdStore.addTracks(tracksToAdd, mode)
-        // Feedback
-        if (mode === 'append') showNotification('Added to queue')
-        if (mode === 'next') showNotification('Playing next')
-        if (mode === 'play') {
-             // Already playing
-        }
-        clearSelection()
+      await mpdStore.addAlbumToPlaylist(artistName.value, albumName.value, mode)
+      if (mode === 'append') showNotification('Added to queue')
+      if (mode === 'next') showNotification('Playing next')
+      if (mode === 'play') showNotification('Playing album')
     } catch (error) {
-        showNotification('Action failed: ' + error.message, 'error')
+      showNotification('Action failed: ' + error.message, 'error')
     }
+    return
+  }
+
+  // Use composable for track selection actions
+  try {
+    await handleQueueAction(mode)
+    if (mode === 'append') showNotification('Added to queue')
+    if (mode === 'next') showNotification('Playing next')
+    if (mode === 'play') showNotification('Playing')
+  } catch (error) {
+    showNotification('Action failed: ' + error.message, 'error')
+  }
 }
 
 const playSingleTrack = (track) => {
@@ -341,6 +392,9 @@ const fetchAlbumDetails = async () => {
     if (tracks.value.length > 0) {
       const firstTrack = tracks.value[0]
       albumPath.value = firstTrack.path.split('/').slice(0, -1).join('/')
+
+      // Check for pre-selection from query parameter
+      handlePreSelection()
     }
   } catch (error) {
     console.error('[AlbumDetailView] Error fetching album details:', error)
@@ -349,6 +403,31 @@ const fetchAlbumDetails = async () => {
     console.log('[AlbumDetailView] Loading complete, albumDetails:', albumDetails.value)
   }
 }
+
+const handlePreSelection = () => {
+    const selectPath = route.query.selectPath
+    if (selectPath && tracks.value.length > 0) {
+        console.log('[AlbumDetailView] Handling pre-selection for:', selectPath)
+        const track = tracks.value.find(t => t.path === selectPath)
+        if (track) {
+            // Already selected?
+            if (!selectedTracks.value.has(track.path)) {
+                toggleSelection(track)
+            }
+            // Scroll to track after a short delay for DOM update
+            setTimeout(() => {
+                const element = document.querySelector(`[data-track-path="${CSS.escape(track.path)}"]`)
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }
+            }, 500)
+        }
+    }
+}
+
+watch(() => route.query.selectPath, () => {
+    handlePreSelection()
+})
 
 const searchMetadata = async () => {
   showMetadataModal.value = true
@@ -374,13 +453,13 @@ const reapplyMetadata = async () => {
   const overlay = mpdStore.albumCache.getOverlay(artistName.value, albumName.value)
   if (overlay && overlay.originalMetadata) {
     try {
-      selectionMetadata.value = true // Reusing searching state
+      searchingMetadata.value = true // Reusing searching state
       const result = await mpdStore.applyMetadata(albumPath.value, overlay.originalMetadata)
       handleMetadataApplied(result)
     } catch (error) {
       showNotification('Reapply failed: ' + error.message, 'error')
     } finally {
-      selectionMetadata.value = false
+      searchingMetadata.value = false
     }
   }
 }
@@ -398,20 +477,15 @@ const fetchCovers = async () => {
 }
 
 const selectCover = async (cover) => {
-  pendingCover.value = cover
-  showConfirmModal.value = true
-}
-
-const handleConfirmCover = async () => {
-  if (!pendingCover.value) return
+  // Prevent multiple simultaneous clicks
+  if (applyingCover.value) return
   
-  applyingCover.value = true
+  applyingCover.value = cover.url
   try {
-    const albumPath = tracks.value[0]?.path.split('/').slice(0, -1).join('/')
-    await mpdStore.applyCoverArt(albumPath, pendingCover.value.url)
+    const albumPathValue = tracks.value[0]?.path.split('/').slice(0, -1).join('/')
+    await mpdStore.applyCoverArt(albumPathValue, cover.url)
     showNotification('Cover art updated successfully')
     showCoverPicker.value = false
-    showConfirmModal.value = false
     
     // Cache bust local cover
     coverBust.value = Date.now()
@@ -421,8 +495,7 @@ const handleConfirmCover = async () => {
   } catch (error) {
     showNotification('Failed to update cover art: ' + error.message, 'error')
   } finally {
-    applyingCover.value = false
-    pendingCover.value = null
+    applyingCover.value = null
   }
 }
 
@@ -436,6 +509,28 @@ const formatDuration = (seconds) => {
   const minutes = Math.floor(seconds / 60)
   const remainingSeconds = Math.floor(seconds % 60)
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+}
+
+const getFileExtension = (path) => {
+  if (!path) return ''
+  const ext = path.split('.').pop()?.toLowerCase() || ''
+  return ext
+}
+
+const getFileExtensionClass = (path) => {
+  const ext = getFileExtension(path)
+  const classes = {
+    'flac': 'bg-purple-600 bg-opacity-20 text-purple-400',
+    'mp3': 'bg-blue-600 bg-opacity-20 text-blue-400',
+    'ogg': 'bg-orange-600 bg-opacity-20 text-orange-400',
+    'wav': 'bg-green-600 bg-opacity-20 text-green-400',
+    'aac': 'bg-pink-600 bg-opacity-20 text-pink-400',
+    'm4a': 'bg-pink-600 bg-opacity-20 text-pink-400',
+    'alac': 'bg-purple-600 bg-opacity-20 text-purple-400',
+    'aiff': 'bg-green-600 bg-opacity-20 text-green-400',
+    'wma': 'bg-yellow-600 bg-opacity-20 text-yellow-400',
+  }
+  return classes[ext] || 'bg-neutral-600 bg-opacity-20 text-neutral-400'
 }
 
 const navigateToArtist = () => {

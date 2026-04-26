@@ -345,6 +345,48 @@ input[type="range"]::-moz-range-thumb {
   }
 }
 
+/* Dot size classes for track duration visualization */
+.dot-size-small {
+  width: 1.5px;
+  height: 1.5px;
+}
+
+.dot-size-medium {
+  width: 2px;
+  height: 2px;
+}
+
+.dot-size-large {
+  width: 3px;
+  height: 3px;
+}
+
+/* Performance optimization: will-change for smooth animations */
+.dot-size-small,
+.dot-size-medium,
+.dot-size-large {
+  will-change: width, height;
+  transition: width 0.1s ease, height 0.1s ease;
+}
+
+/* High contrast mode adjustments for dots */
+@media (prefers-contrast: high) {
+  .dot-size-small,
+  .dot-size-medium,
+  .dot-size-large {
+    border: 1px solid #ffffff;
+  }
+}
+
+/* Reduced motion for dots */
+@media (prefers-reduced-motion: reduce) {
+  .dot-size-small,
+  .dot-size-medium,
+  .dot-size-large {
+    transition: none;
+  }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,

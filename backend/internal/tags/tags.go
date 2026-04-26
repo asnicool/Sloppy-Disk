@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/dhowden/tag"
-	"mpd-client-modern/internal/models"
+	"sloppy-disk/internal/models"
 )
 
 // ReadTags reads metadata from an audio file

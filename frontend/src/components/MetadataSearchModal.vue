@@ -172,41 +172,269 @@
               </div>
 
               <!-- Selected Details -->
-              <div v-if="selectedCandidate?.externalId === candidate.externalId && selectedCandidate?.source === candidate.source" class="mt-6 space-y-6 animate-in slide-in-from-top-2 duration-300">
+              <div v-if="selectedCandidate?.externalId === candidate.externalId && selectedCandidate?.source === candidate.source" class="mt-6 space-y-6 animate-in slide-in-from-top-2 duration-300" @click.stop>
                 <div class="grid grid-cols-2 gap-4">
                   <div class="space-y-1">
                     <label class="text-[10px] font-bold text-neutral-500 uppercase">Album</label>
-                    <input v-model="selectedCandidate.album" class="w-full px-2 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-sm text-white focus:border-blue-500 outline-none"/>
+                    <input v-model="selectedCandidate.album" @click.stop class="w-full px-2 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-sm text-white focus:border-blue-500 outline-none"/>
                   </div>
                   <div class="space-y-1">
                     <label class="text-[10px] font-bold text-neutral-500 uppercase">Artist</label>
-                    <input v-model="selectedCandidate.artist" class="w-full px-2 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-sm text-white focus:border-blue-500 outline-none"/>
+                    <input v-model="selectedCandidate.artist" @click.stop class="w-full px-2 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-sm text-white focus:border-blue-500 outline-none"/>
                   </div>
                   <div class="space-y-1">
                     <label class="text-[10px] font-bold text-neutral-500 uppercase">Year</label>
-                    <input v-model="selectedCandidate.year" class="w-full px-2 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-sm text-white focus:border-blue-500 outline-none"/>
+                    <input v-model="selectedCandidate.year" @click.stop class="w-full px-2 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-sm text-white focus:border-blue-500 outline-none"/>
                   </div>
                   <div class="space-y-1">
                     <label class="text-[10px] font-bold text-neutral-500 uppercase">Genre</label>
-                    <input v-model="selectedCandidate.genre" class="w-full px-2 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-sm text-white focus:border-blue-500 outline-none"/>
+                    <input v-model="selectedCandidate.genre" @click.stop class="w-full px-2 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-sm text-white focus:border-blue-500 outline-none"/>
                   </div>
                 </div>
 
-                <!-- Tracks List -->
-                <div v-if="selectedCandidate.tracks?.length" class="space-y-2">
-                  <div class="text-[10px] font-bold text-neutral-500 uppercase">Track Matching</div>
+                <!-- Track Matching & Granular Controls -->
+                <div v-if="selectedCandidate.tracks?.length && localTracks.length > 0" class="space-y-4" @click.stop>
+                  <div class="flex items-center justify-between">
+                    <div class="text-[10px] font-bold text-neutral-500 uppercase">Track Matching</div>
+                    <button @click.stop="runTrackMatching" class="text-xs text-blue-400 hover:text-blue-300">
+                      {{ trackMatchResult ? 'Refresh Match' : 'Match Tracks' }}
+                    </button>
+                  </div>
+
+                  <!-- Match Statistics -->
+                  <div v-if="trackMatchResult" class="flex flex-wrap gap-2 text-[10px]">
+                    <span class="px-2 py-1 rounded bg-green-900/30 text-green-400 border border-green-700/30">
+                      ✓ {{ trackMatchResult.stats.matched }} matched
+                    </span>
+                    <span v-if="trackMatchResult.stats.libraryOnly > 0" class="px-2 py-1 rounded bg-amber-900/30 text-amber-400 border border-amber-700/30">
+                      − {{ trackMatchResult.stats.libraryOnly }} only in library
+                    </span>
+                    <span v-if="trackMatchResult.stats.metadataOnly > 0" class="px-2 py-1 rounded bg-blue-900/30 text-blue-400 border border-blue-700/30">
+                      + {{ trackMatchResult.stats.metadataOnly }} only in metadata
+                    </span>
+                    <span v-if="trackMatchResult.stats.orderChanged" class="px-2 py-1 rounded bg-purple-900/30 text-purple-400 border border-purple-700/30">
+      ⇄ Different order
+                    </span>
+                  </div>
+
+                  <!-- Matched Tracks (Side-by-Side) -->
+                  <div v-if="trackMatchResult?.matches?.length" class="space-y-2">
+                    <div class="text-[10px] font-bold text-neutral-600 uppercase">Matched Tracks</div>
+                    <div class="max-h-80 overflow-y-auto rounded-lg border border-neutral-700/50 bg-neutral-900/30 divide-y divide-neutral-800">
+                      <div
+                        v-for="(match, idx) in trackMatchResult.matches"
+                        :key="`match-${idx}`"
+                        class="p-3 hover:bg-neutral-800/50 transition-colors"
+                        :class="{
+                          'bg-green-900/10': match.matchType === 'exact' && match.titleSimilarity >= 95,
+                          'bg-amber-900/10': match.matchType === 'fuzzy' || match.titleSimilarity < 95
+                        }"
+                      >
+                        <!-- Match Header -->
+                        <div class="flex items-center justify-between mb-2">
+                          <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-mono text-neutral-500">
+                              {{ match.library.disc ? match.library.disc + '-' : '' }}{{ String(match.library.track || 0).padStart(2, '0') }}
+                            </span>
+                            <span :class="['text-[10px] font-bold', getMatchStatusClass(match)]">
+                              {{ getMatchStatus(match) }}
+                            </span>
+                            <span class="text-[10px] text-neutral-600">
+                              {{ Math.round(match.titleSimilarity) }}% similar
+                            </span>
+                          </div>
+                          <button
+                            @click.stop="toggleTrackUpdate(match)"
+                            :class="[
+                              'px-2 py-1 rounded text-[10px] font-bold uppercase transition-all',
+                              trackUpdatesEnabled[getTrackId(match)]
+                                ? 'bg-green-600 text-white'
+                                : 'bg-neutral-700 text-neutral-400 hover:bg-neutral-600'
+                            ]"
+                          >
+                            {{ trackUpdatesEnabled[getTrackId(match)] ? '✓ Update' : 'Skip' }}
+                          </button>
+                        </div>
+
+                        <!-- Side-by-Side Comparison -->
+                        <div class="grid grid-cols-2 gap-3 text-xs">
+                          <!-- Library Track (Current) -->
+                          <div class="space-y-1">
+                            <div class="text-[10px] font-bold text-neutral-500 uppercase">Library (Current)</div>
+                            <input
+                              :value="match.library.title"
+                              @input="updateLibraryTrackTitle(match, $event.target.value)"
+                              class="w-full px-2 py-1 bg-neutral-900 border border-neutral-700 rounded text-neutral-300 focus:border-blue-500 outline-none"
+                              @click.stop
+                            />
+                          </div>
+
+                          <!-- Metadata Track (New) -->
+                          <div class="space-y-1">
+                            <div class="text-[10px] font-bold text-blue-400 uppercase">Metadata (New)</div>
+                            <input
+                              v-model="match.metadata.title"
+                              class="w-full px-2 py-1 bg-neutral-900 border border-blue-700/50 rounded text-white focus:border-blue-500 outline-none"
+                              @click.stop
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Library-Only Tracks -->
+                  <div v-if="trackMatchResult?.libraryOnly?.length" class="space-y-2">
+                    <div class="text-[10px] font-bold text-amber-600 uppercase">Only in Library (No Metadata Match)</div>
+                    <div class="max-h-40 overflow-y-auto rounded-lg border border-amber-900/30 bg-amber-900/10 divide-y divide-amber-900/20">
+                      <div
+                        v-for="(track, idx) in trackMatchResult.libraryOnly"
+                        :key="`libonly-${idx}`"
+                        class="p-2 flex items-center gap-3"
+                      >
+                        <span class="text-[10px] font-mono text-amber-700">
+                          {{ track.disc ? track.disc + '-' : '' }}{{ String(track.track || 0).padStart(2, '0') }}
+                        </span>
+                        <input
+                          :value="track.title"
+                          disabled
+                          class="flex-1 px-2 py-1 bg-neutral-900/50 border border-neutral-800 rounded text-neutral-500 text-xs"
+                        />
+                        <span class="text-[10px] text-amber-600 font-bold">No Match</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Metadata-Only Tracks -->
+                  <div v-if="trackMatchResult?.metadataOnly?.length" class="space-y-2">
+                    <div class="text-[10px] font-bold text-blue-600 uppercase">Only in Metadata (Not in Library)</div>
+                    <div class="max-h-40 overflow-y-auto rounded-lg border border-blue-900/30 bg-blue-900/10 divide-y divide-blue-900/20">
+                      <div
+                        v-for="(track, idx) in trackMatchResult.metadataOnly"
+                        :key="`metaonly-${idx}`"
+                        class="p-2 flex items-center gap-3"
+                      >
+                        <span class="text-[10px] font-mono text-blue-700">
+                          {{ track.disc ? track.disc + '-' : '' }}{{ String(track.track || 0).padStart(2, '0') }}
+                        </span>
+                        <input
+                          v-model="track.title"
+                          class="flex-1 px-2 py-1 bg-neutral-900 border border-blue-700/30 rounded text-white text-xs"
+                          @click.stop
+                        />
+                        <span class="text-[10px] text-blue-600 font-bold">Extra</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Granular Update Controls -->
+                  <div class="pt-4 border-t border-neutral-800 space-y-3">
+                    <div class="text-[10px] font-bold text-neutral-500 uppercase">Update Options</div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                      <!-- Album-level metadata -->
+                      <div class="space-y-2 p-3 rounded-lg bg-neutral-900/50 border border-neutral-800">
+                        <div class="text-[10px] font-bold text-neutral-400 uppercase mb-2">Album Fields</div>
+
+                        <label class="flex items-center gap-2 text-xs cursor-pointer hover:text-white">
+                          <input
+                            type="checkbox"
+                            v-model="updateOptions.genre"
+                            class="w-4 h-4 rounded border-neutral-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                          />
+                          <span>Genre</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 text-xs cursor-pointer hover:text-white">
+                          <input
+                            type="checkbox"
+                            v-model="updateOptions.year"
+                            class="w-4 h-4 rounded border-neutral-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                          />
+                          <span>Year</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 text-xs cursor-pointer hover:text-white">
+                          <input
+                            type="checkbox"
+                            v-model="updateOptions.album"
+                            class="w-4 h-4 rounded border-neutral-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                          />
+                          <span>Album Name</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 text-xs cursor-pointer hover:text-white">
+                          <input
+                            type="checkbox"
+                            v-model="updateOptions.artist"
+                            class="w-4 h-4 rounded border-neutral-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                          />
+                          <span>Artist</span>
+                        </label>
+                      </div>
+
+                      <!-- Track-level metadata -->
+                      <div class="space-y-2 p-3 rounded-lg bg-neutral-900/50 border border-neutral-800">
+                        <div class="text-[10px] font-bold text-neutral-400 uppercase mb-2">Track Fields</div>
+
+                        <label class="flex items-center gap-2 text-xs cursor-pointer hover:text-white">
+                          <input
+                            type="checkbox"
+                            v-model="updateOptions.trackTitles"
+                            class="w-4 h-4 rounded border-neutral-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                          />
+                          <span>Track Titles</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 text-xs cursor-pointer hover:text-white">
+                          <input
+                            type="checkbox"
+                            v-model="updateOptions.trackNumbers"
+                            class="w-4 h-4 rounded border-neutral-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                          />
+                          <span>Track Numbers</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 text-xs cursor-pointer hover:text-white">
+                          <input
+                            type="checkbox"
+                            v-model="updateOptions.coverArt"
+                            class="w-4 h-4 rounded border-neutral-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                          />
+                          <span>Cover Art</span>
+                        </label>
+
+                        <div class="pt-2 border-t border-neutral-800">
+                          <div class="text-[10px] text-neutral-500 mb-1">Individual Track Control</div>
+                          <div class="text-[10px] text-neutral-600">
+                            {{ Object.values(trackUpdatesEnabled).filter(v => v).length }} / {{ trackMatchResult?.matches?.length || 0 }} tracks enabled
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="text-[10px] text-neutral-500 italic">
+                      💡 If nothing is checked, all metadata will be updated. Check specific items to update only those.
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Fallback: Original track list when no library tracks -->
+                <div v-else-if="selectedCandidate.tracks?.length" class="space-y-2" @click.stop>
+                  <div class="text-[10px] font-bold text-neutral-500 uppercase">Track List</div>
                   <div class="max-h-60 overflow-y-auto rounded-lg border border-neutral-700/50 bg-neutral-900/50 divide-y divide-neutral-800">
                     <div v-for="track in selectedCandidate.tracks" :key="track.track" class="flex gap-4 items-center p-2 group/track">
                        <span class="text-xs font-mono text-neutral-600 group-hover/track:text-blue-500 transition-colors">
                         {{ track.disc ? track.disc + '-' : '' }}{{ track.track.toString().padStart(2, '0') }}
                       </span>
-                      <input v-model="track.title" class="flex-1 bg-transparent border-none text-xs text-white p-0 focus:ring-0 placeholder-neutral-700" placeholder="Unnamed Track"/>
+                      <input v-model="track.title" @click.stop class="flex-1 bg-transparent border-none text-xs text-white p-0 focus:ring-0 placeholder-neutral-700" placeholder="Unnamed Track"/>
                     </div>
                   </div>
+                  <p class="text-[10px] text-neutral-600">Library tracks not available - edit metadata directly above</p>
                 </div>
 
                 <!-- Cover Art -->
-                <div v-if="coverArtOptions.length > 0" class="space-y-2">
+                <div v-if="coverArtOptions.length > 0" class="space-y-2" @click.stop>
                   <div class="text-[10px] font-bold text-neutral-500 uppercase">Cover Selection</div>
                   <div class="flex gap-3 flex-wrap">
                     <div
@@ -236,15 +464,27 @@
                   </div>
                 </div>
 
-                <div class="pt-2">
+                <div class="pt-2 space-y-3" @click.stop>
                   <button
                     @click.stop="handleApply"
                     :disabled="applying"
                     class="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black uppercase tracking-wider transition-all shadow-lg shadow-green-900/20 disabled:opacity-50"
                   >
-                    {{ applying ? 'Tagging Files...' : 'Apply All changes' }}
+                    {{ applying === 'metadata' ? 'Tagging Files...' : 'Apply All Changes' }}
                   </button>
-                  
+
+                  <button
+                    @click.stop="handleApplyCoverOnly"
+                    :disabled="applying || !selectedCoverArt"
+                    class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold uppercase tracking-wider transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50"
+                  >
+                    {{ applying === 'cover' ? 'Setting Cover...' : 'Apply Cover Only' }}
+                  </button>
+
+                  <p v-if="!selectedCoverArt" class="text-xs text-neutral-500 text-center">
+                    Select a cover image above to enable "Apply Cover Only"
+                  </p>
+
                   <div v-if="applyResult" class="mt-4 p-4 bg-green-900/20 border border-green-500/30 rounded-xl">
                     <div class="flex items-center gap-2 text-green-400 font-bold text-sm">
                       <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -289,6 +529,7 @@ import { ref, watch, computed } from 'vue'
 import { useMetadata } from '../composables/useMetadata'
 import { useMpdStore } from '../stores/mpdStore'
 import BaseModal from './BaseModal.vue'
+import { matchTracks, getMatchStatus, getMatchStatusClass } from '@/utils/trackMatcher'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -296,7 +537,8 @@ const props = defineProps({
   initialAlbum: String,
   albumPath: String,
   trackCount: Number,
-  duration: Number
+  duration: Number,
+  libraryTracks: Array // New prop: library tracks for matching
 })
 
 const emit = defineEmits(['close', 'applied', 'coverUpdated'])
@@ -330,6 +572,22 @@ const isDragging = ref(false)
 const uploadedFile = ref(null)
 const uploadedFileUrl = ref(null)
 const fileInput = ref(null)
+
+// Track Matching State
+const localTracks = ref([])
+const trackMatchResult = ref(null)
+const trackUpdatesEnabled = ref({}) // Map of track IDs to boolean (enable/disable individual track updates)
+
+// Granular Update Options
+const updateOptions = ref({
+  genre: false,
+  year: false,
+  album: false,
+  artist: false,
+  trackTitles: false,
+  trackNumbers: false,
+  coverArt: false
+})
 
 // Display value for inputs
 const displayArtist = computed({
@@ -369,21 +627,28 @@ const handleSearch = async () => {
 const selectCandidate = async (candidate) => {
   if (selectedCandidate.value?.externalId === candidate.externalId && selectedCandidate.value?.source === candidate.source) {
     selectedCandidate.value = null
+    trackMatchResult.value = null
     return
   }
-  
+
   selectedCandidate.value = candidate
   await getMetadataDetails(candidate.source, candidate.externalId)
+
+  // Fetch library tracks for matching
+  await fetchLibraryTracks()
 }
 
 const handleApply = async () => {
   if (!selectedCandidate.value || !props.albumPath) return
-  
-  applying.value = true
+
+  applying.value = 'metadata'
   try {
+    // Build metadata to apply based on granular options
+    const metadataToApply = buildMetadataToApply()
+
     const result = await applyMetadata(
       props.albumPath,
-      selectedCandidate.value,
+      metadataToApply,
       selectedCoverArt.value?.url || ''
     )
     if (result) {
@@ -391,6 +656,85 @@ const handleApply = async () => {
     }
   } catch (e) {
     console.error('Failed to apply metadata:', e)
+  } finally {
+    applying.value = false
+  }
+}
+
+const buildMetadataToApply = () => {
+  const candidate = selectedCandidate.value
+
+  // If no granular options selected, return everything (current behavior)
+  if (!hasUpdateOptions.value) {
+    return candidate
+  }
+
+  // Build filtered metadata based on options
+  const filtered = {
+    ...candidate,
+    // Album-level fields
+    album: updateOptions.value.album ? candidate.album : undefined,
+    artist: updateOptions.value.artist ? candidate.artist : undefined,
+    year: updateOptions.value.year ? candidate.year : undefined,
+    genre: updateOptions.value.genre ? candidate.genre : undefined,
+
+    // Track-level fields
+    tracks: candidate.tracks?.map(track => {
+      const filteredTrack = { ...track }
+
+      // Filter track title
+      if (!updateOptions.value.trackTitles) {
+        delete filteredTrack.title
+      }
+
+      // Filter track/disc numbers
+      if (!updateOptions.value.trackNumbers) {
+        delete filteredTrack.track
+        delete filteredTrack.disc
+      }
+
+      return filteredTrack
+    }).filter(t => Object.keys(t).length > 0)
+  }
+
+  // Remove undefined keys
+  Object.keys(filtered).forEach(key => {
+    if (filtered[key] === undefined) {
+      delete filtered[key]
+    }
+  })
+
+  return filtered
+}
+
+const fetchLibraryTracks = async () => {
+  if (!props.initialArtist || !props.initialAlbum) return
+
+  try {
+    const response = await mpdStore.fetchAlbumSongs(props.initialArtist, props.initialAlbum)
+
+    if (response.success && response.data?.tracks) {
+      localTracks.value = response.data.tracks
+      console.log('[MetadataSearchModal] Loaded library tracks:', localTracks.value.length)
+    } else if (response.tracks) {
+      // Cached response
+      localTracks.value = response.tracks
+      console.log('[MetadataSearchModal] Loaded library tracks (cached):', localTracks.value.length)
+    }
+  } catch (error) {
+    console.error('[MetadataSearchModal] Failed to fetch library tracks:', error)
+  }
+}
+
+const handleApplyCoverOnly = async () => {
+  if (!selectedCoverArt.value || !props.albumPath) return
+  
+  applying.value = 'cover'
+  try {
+    await mpdStore.applyCoverArt(props.albumPath, selectedCoverArt.value.url)
+    emit('coverUpdated')
+  } catch (e) {
+    console.error('Failed to apply cover:', e)
   } finally {
     applying.value = false
   }
@@ -470,8 +814,57 @@ const isProviderSelected = (provider) => {
   return selectedProviders.value.includes(provider)
 }
 
+// Track Matching Functions
+const runTrackMatching = () => {
+  if (!selectedCandidate.value?.tracks || !localTracks.value.length) {
+    console.warn('[MetadataSearchModal] Cannot run track matching - missing data')
+    return
+  }
+
+  const result = matchTracks(localTracks.value, selectedCandidate.value.tracks)
+  trackMatchResult.value = result
+
+  // Initialize track update flags (all enabled by default)
+  result.matches.forEach((match, idx) => {
+    const trackId = getTrackId(match)
+    trackUpdatesEnabled.value[trackId] = true
+  })
+
+  console.log('[MetadataSearchModal] Track matching complete:', result.stats)
+}
+
+const getTrackId = (match) => {
+  return `${match.library.disc || 1}-${match.library.track || 0}`
+}
+
+const toggleTrackUpdate = (match) => {
+  const trackId = getTrackId(match)
+  trackUpdatesEnabled.value[trackId] = !trackUpdatesEnabled.value[trackId]
+}
+
+const updateLibraryTrackTitle = (match, newTitle) => {
+  // Update the library track title in the match result
+  if (match && match.library) {
+    match.library.title = newTitle
+
+    // Also update in local tracks if present
+    const localTrack = localTracks.value.find(t =>
+      t.disc === match.library.disc &&
+      t.track === match.library.track
+    )
+    if (localTrack) {
+      localTrack.title = newTitle
+    }
+  }
+}
+
+// Check if any update options are selected
+const hasUpdateOptions = computed(() => {
+  return Object.values(updateOptions.value).some(v => v)
+})
+
 // Initialize with props
-watch(() => props.isOpen, (isOpen) => {
+watch(() => props.isOpen, async (isOpen) => {
   if (isOpen) {
     searchArtist.value = ''
     searchAlbum.value = ''
@@ -479,6 +872,23 @@ watch(() => props.isOpen, (isOpen) => {
     clearSelection()
     clearUpload()
     manualCoverUrl.value = ''
+
+    // Load library tracks for matching
+    await fetchLibraryTracks()
+  } else {
+    // Clean up on close
+    localTracks.value = []
+    trackMatchResult.value = null
+    trackUpdatesEnabled.value = {}
+    updateOptions.value = {
+      genre: false,
+      year: false,
+      album: false,
+      artist: false,
+      trackTitles: false,
+      trackNumbers: false,
+      coverArt: false
+    }
   }
 })
 </script>

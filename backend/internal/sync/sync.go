@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"mpd-client-modern/internal/config"
-	"mpd-client-modern/internal/models"
+	"sloppy-disk/internal/config"
+	"sloppy-disk/internal/models"
 )
 
 type Manager struct {

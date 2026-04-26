@@ -3,18 +3,19 @@ package metadata
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
-	"mpd-client-modern/internal/config"
-	"mpd-client-modern/internal/models"
+	"sloppy-disk/internal/config"
+	"sloppy-disk/internal/models"
 )
 
 const (
 	discogsAPIURL    = "https://api.discogs.com"
-	discogsUserAgent = "mpd-client-modern/1.0"
+	discogsUserAgent = "sloppy-disk/1.0"
 )
 
 // DiscogsProvider implements the Provider interface for Discogs
@@ -325,6 +326,136 @@ func (p *DiscogsProvider) newRequest(method, path string, params url.Values) (*h
 	}
 	req.Header.Set("User-Agent", discogsUserAgent)
 	return req, nil
+}
+
+// GetArtistImage fetches artist images from Discogs
+func (p *DiscogsProvider) GetArtistImage(artistName string) ([]models.ArtistImageCandidate, error) {
+	log.Printf("[Discogs] GetArtistImage called for: %s", artistName)
+
+	cfg := config.Get()
+	hasKeySecret := cfg.DiscogsKey != "" && cfg.DiscogsSecret != ""
+	hasToken := cfg.DiscogsToken != ""
+
+	if !hasKeySecret && !hasToken {
+		log.Printf("[Discogs] No credentials configured")
+		return nil, fmt.Errorf("Discogs credentials not configured")
+	}
+
+	// Step 1: Search for the artist
+	query := url.Values{}
+	query.Set("q", artistName)
+	query.Set("type", "artist")
+
+	req, err := p.newRequest("GET", "/database/search", query)
+	if err != nil {
+		return nil, NewProviderError("Discogs", err)
+	}
+
+	if hasKeySecret {
+		req.Header.Set("Authorization", fmt.Sprintf("Discogs key=%s, secret=%s", cfg.DiscogsKey, cfg.DiscogsSecret))
+	} else if hasToken {
+		req.Header.Set("Authorization", "Discogs token="+cfg.DiscogsToken)
+	}
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, NewProviderError("Discogs", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, NewProviderError("Discogs", fmt.Errorf("search API error: %s", resp.Status))
+	}
+
+	var searchResult struct {
+		Results []struct {
+			ID          int    `json:"id"`
+			Title       string `json:"title"`
+			Thumb       string `json:"thumb"`
+			AvatarURL   string `json:"avatar_url"`
+			ResourceURL string `json:"resource_url"`
+		} `json:"results"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&searchResult); err != nil {
+		return nil, NewProviderError("Discogs", err)
+	}
+
+	if len(searchResult.Results) == 0 {
+		return []models.ArtistImageCandidate{}, nil
+	}
+
+	// Get the best match (first result)
+	artist := searchResult.Results[0]
+
+	// Step 2: Get artist details to fetch images
+	detailsReq, err := http.NewRequest("GET", artist.ResourceURL, nil)
+	if err != nil {
+		return nil, NewProviderError("Discogs", err)
+	}
+	detailsReq.Header.Set("User-Agent", discogsUserAgent)
+
+	if hasKeySecret {
+		detailsReq.Header.Set("Authorization", fmt.Sprintf("Discogs key=%s, secret=%s", cfg.DiscogsKey, cfg.DiscogsSecret))
+	} else if hasToken {
+		detailsReq.Header.Set("Authorization", "Discogs token="+cfg.DiscogsToken)
+	}
+
+	detailsResp, err := p.client.Do(detailsReq)
+	if err != nil {
+		return nil, NewProviderError("Discogs", err)
+	}
+	defer detailsResp.Body.Close()
+
+	if detailsResp.StatusCode != http.StatusOK {
+		return nil, NewProviderError("Discogs", fmt.Errorf("artist details API error: %s", detailsResp.Status))
+	}
+
+	var artistDetails struct {
+		ID     int    `json:"id"`
+		Name   string `json:"name"`
+		Images []struct {
+			Type     string `json:"type"`
+			URI      string `json:"uri"`
+			Resource string `json:"resource_url"`
+			Width    int    `json:"width"`
+			Height   int    `json:"height"`
+		} `json:"images"`
+		Profile string `json:"profile"`
+	}
+
+	if err := json.NewDecoder(detailsResp.Body).Decode(&artistDetails); err != nil {
+		return nil, NewProviderError("Discogs", err)
+	}
+
+	var candidates []models.ArtistImageCandidate
+
+	// Add images from artist details
+	for _, img := range artistDetails.Images {
+		// Only primary images
+		if img.Type != "primary" && img.Type != "secondary" {
+			continue
+		}
+
+		candidates = append(candidates, models.ArtistImageCandidate{
+			Source:    "Discogs",
+			URL:       img.URI,
+			Thumbnail: img.URI + "?width=250&height=250",
+			Width:     img.Width,
+			Height:    img.Height,
+		})
+	}
+
+	// If no images from details, try thumbnail/avatar from search
+	if len(candidates) == 0 && artist.Thumb != "" {
+		candidates = append(candidates, models.ArtistImageCandidate{
+			Source:    "Discogs",
+			URL:       artist.Thumb,
+			Thumbnail: artist.Thumb,
+		})
+	}
+
+	return candidates, nil
 }
 
 // Helper function to find last index of a substring

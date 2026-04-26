@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync"
 
-	"mpd-client-modern/internal/albumcache"
-	"mpd-client-modern/internal/models"
-	"mpd-client-modern/internal/mpd"
+	"sloppy-disk/internal/albumcache"
+	"sloppy-disk/internal/models"
+	"sloppy-disk/internal/mpd"
 )
 
 // PerformStreamingSearch executes multiple searches in parallel and sends results via WS

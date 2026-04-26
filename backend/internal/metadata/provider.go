@@ -1,7 +1,7 @@
 package metadata
 
 import (
-	"mpd-client-modern/internal/models"
+	"sloppy-disk/internal/models"
 )
 
 // Provider defines the interface for music metadata providers
