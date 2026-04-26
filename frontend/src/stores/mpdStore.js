@@ -88,6 +88,7 @@ export const useMpdStore = defineStore('mpd', () => {
 
   // Getters
   const currentSong = computed(() => status.value?.currentSong)
+  const currentSongPath = computed(() => status.value?.currentSong?.path)
   const isPlaying = computed(() => status.value?.state === 'play')
   const currentTime = computed(() => status.value?.elapsed || 0)
   const duration = computed(() => status.value?.duration || 0)
@@ -558,8 +559,27 @@ export const useMpdStore = defineStore('mpd', () => {
 
   const moveTrack = async (from, to) => {
     try {
+      const expectedPath = currentSongPath.value
+      if (expectedPath) {
+        console.log('[MPD Store] Move track: current track before move:', expectedPath)
+      }
+
       await axios.post(`${API_BASE}/playlist/move`, { from, to })
-      await fetchPlaylist()
+      const playlistResponse = await fetchPlaylist()
+
+      const actualPath = playlistResponse?.data?.currentSongPath || currentSongPath.value
+
+      if (expectedPath && actualPath && expectedPath !== actualPath) {
+        const newIdx = playlist.value.findIndex(t => t.path === expectedPath)
+        console.error('[MPD Store] ⚠️  CURRENT TRACK JUMP DETECTED after track move!')
+        console.error(`[MPD Store]   Expected: ${expectedPath}`)
+        console.error(`[MPD Store]   Actual:   ${actualPath}`)
+        if (newIdx !== -1) {
+          console.error(`[MPD Store]   Expected track now at playlist position ${newIdx}`)
+        } else {
+          console.error('[MPD Store]   Expected track NOT FOUND in current playlist')
+        }
+      }
     } catch (error) {
       console.error('Move track failed:', error)
       throw error
@@ -568,8 +588,28 @@ export const useMpdStore = defineStore('mpd', () => {
 
   const moveAlbum = async (start, length, to) => {
     try {
+      const expectedPath = currentSongPath.value
+      if (expectedPath) {
+        console.log('[MPD Store] Move album: current track before move:', expectedPath)
+      }
+
       await axios.post(`${API_BASE}/playlist/move`, { from: start, to, length })
-      await fetchPlaylist()
+      const playlistResponse = await fetchPlaylist()
+
+      const actualPath = playlistResponse?.data?.currentSongPath || currentSongPath.value
+
+      if (expectedPath && actualPath && expectedPath !== actualPath) {
+        const newIdx = playlist.value.findIndex(t => t.path === expectedPath)
+        console.error('[MPD Store] ⚠️  CURRENT TRACK JUMP DETECTED after album move!')
+        console.error(`[MPD Store]   Expected: ${expectedPath}`)
+        console.error(`[MPD Store]   Actual:   ${actualPath}`)
+        console.error(`[MPD Store]   Move params: from=${start}, length=${length}, to=${to}`)
+        if (newIdx !== -1) {
+          console.error(`[MPD Store]   Expected track now at playlist position ${newIdx}`)
+        } else {
+          console.error('[MPD Store]   Expected track NOT FOUND in current playlist')
+        }
+      }
     } catch (error) {
       console.error('Move album failed:', error)
       throw error

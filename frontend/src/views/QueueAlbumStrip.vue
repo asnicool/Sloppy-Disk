@@ -170,8 +170,11 @@ const dragOverTrashcan = ref(false)
 let draggedItem = null
 let draggedType = null
 let draggedTrackPos = null
+const isMutating = ref(false)
+const lastDragEnd = ref(0)
+const DRAG_PLAY_COOLDOWN = 800
 
-const { handlers: doubleTapHandlers } = useDoubleTapSimple({ delay: 300 })
+const { handlers: doubleTapHandlers, reset: resetDoubleTap } = useDoubleTapSimple({ delay: 300 })
 
 onMounted(() => {
   const saved = localStorage.getItem(STORAGE_KEY)
@@ -186,10 +189,16 @@ const toggleCompact = () => {
 }
 
 const playAlbumFromStart = (group) => {
+  const timeSinceDrag = Date.now() - lastDragEnd.value
+  if (timeSinceDrag < DRAG_PLAY_COOLDOWN) {
+    console.log('[QueueAlbumStrip] Blocked album play — within drag cooldown (%dms)', timeSinceDrag)
+    return
+  }
   mpdStore.playTrack(group.startPos)
 }
 
 const getAlbumCoverHandlers = (group) => {
+  if (isDragging.value) return {}
   return doubleTapHandlers(() => playAlbumFromStart(group))
 }
 
@@ -234,18 +243,21 @@ const groupedPlaylist = computed({
     const groups = []
     let currentGroup = null
     const currentPos = mpdStore.playlistCurrentPos
+    const currentSongPath = mpdStore.currentSongPath
 
     playlist.forEach((track, index) => {
       const key = `${track.album || ''}-${track.artist || ''}`
-      const isCurrentTrack = index === currentPos
-      
+      // FIX: Use song identity (path) instead of position index to determine current track
+      // This prevents "jumping" when playlist order changes via moves
+      const isCurrentTrack = currentSongPath ? track.path === currentSongPath : index === currentPos
+
       if (!currentGroup || currentGroup.key !== key) {
         if (currentGroup) {
           calculateDotSizes(currentGroup.tracks)
           currentGroup.isFullyPlayed = currentGroup.tracks.every(t => t.isPlayed)
           groups.push(currentGroup)
         }
-        
+
         let coverUrl = null
         const dir = track.path.substring(0, track.path.lastIndexOf('/'))
         const escapedDir = dir.split('/').map(encodeURIComponent).join('/')
@@ -266,11 +278,11 @@ const groupedPlaylist = computed({
           isFullyPlayed: false
         }
       }
-      
+
       if (isCurrentTrack) {
         currentGroup.hasCurrentTrack = true
       }
-      
+
       const trackWithDuration = {
         ...track,
         isCurrentTrack,
@@ -278,11 +290,11 @@ const groupedPlaylist = computed({
         duration: track.duration || 0,
         dotSize: 'small'
       }
-      
+
       currentGroup.tracks.push(trackWithDuration)
       currentGroup.totalDuration += track.duration || 0
     })
-    
+
     if (currentGroup) {
       calculateDotSizes(currentGroup.tracks)
       currentGroup.isFullyPlayed = currentGroup.tracks.every(t => t.isPlayed)
@@ -300,36 +312,51 @@ const playedAlbumsCount = computed(() => {
 
 const handleAlbumChange = (event) => {
   if (event.moved) {
+    if (isMutating.value) return
+    isMutating.value = true
+
     const { element, newIndex, oldIndex } = event.moved
     const groups = groupedPlaylist.value
     const movedGroup = groups[oldIndex]
-    
+
     const tempGroups = [...groups]
     const [removed] = tempGroups.splice(oldIndex, 1)
     tempGroups.splice(newIndex, 0, removed)
-    
+
     let targetPos = 0
     for (let i = 0; i < newIndex; i++) {
       targetPos += tempGroups[i].tracks.length
     }
-    
+
     const start = movedGroup.startPos
-    mpdStore.moveAlbum(start, movedGroup.tracks.length, targetPos)
+    mpdStore.moveAlbum(start, movedGroup.tracks.length, targetPos).finally(() => {
+      isMutating.value = false
+    })
   }
 }
 
 const handleTrackMove = ({ from, to }) => {
-  mpdStore.moveTrack(from, to)
+  if (isMutating.value) return
+  isMutating.value = true
+  mpdStore.moveTrack(from, to).finally(() => {
+    isMutating.value = false
+  })
 }
 
 const handleTrackRemove = (pos) => {
-  mpdStore.removeFromPlaylist(pos)
+  if (isMutating.value) return
+  isMutating.value = true
+  mpdStore.removeFromPlaylist(pos).finally(() => {
+    isMutating.value = false
+  })
 }
 
-const removeAlbum = (group) => {
-  for (let i = group.tracks.length - 1; i >= 0; i--) {
-    mpdStore.removeFromPlaylist(group.startPos + i)
+const removeAlbum = async (group) => {
+  const positions = []
+  for (let i = 0; i < group.tracks.length; i++) {
+    positions.push(group.startPos + i)
   }
+  await mpdStore.removeMultipleFromPlaylist(positions)
 }
 
 const removePlayedAlbums = async () => {
@@ -360,6 +387,7 @@ const removePlayedAlbums = async () => {
 
 const onDragStart = (event) => {
   isDragging.value = true
+  resetDoubleTap()
   const groups = groupedPlaylist.value
   const oldIndex = event.oldIndex
   if (oldIndex !== undefined && groups[oldIndex]) {
@@ -371,6 +399,9 @@ const onDragStart = (event) => {
 const onDragEnd = () => {
   isDragging.value = false
   dragOverTrashcan.value = false
+  lastDragEnd.value = Date.now()
+  resetDoubleTap()
+  isMutating.value = false
   draggedItem = null
   draggedType = null
   draggedTrackPos = null
@@ -384,6 +415,7 @@ const onTrackDragStart = () => {
 const onTrackDragEnd = () => {
   isDragging.value = false
   dragOverTrashcan.value = false
+  isMutating.value = false
   draggedItem = null
   draggedType = null
   draggedTrackPos = null
@@ -404,14 +436,22 @@ const onTrashcanDragLeave = () => {
   dragOverTrashcan.value = false
 }
 
-const onTrashcanDrop = () => {
+const onTrashcanDrop = async () => {
   dragOverTrashcan.value = false
   isDragging.value = false
 
   if (draggedType === 'album' && draggedItem) {
-    removeAlbum(draggedItem)
+    await mpdStore.fetchPlaylist()
+    const groups = groupedPlaylist.value
+    const current = groups.find(g => g.id === draggedItem.id)
+    if (current) {
+      await removeAlbum(current)
+    }
   } else if (draggedType === 'track' && draggedTrackPos !== null) {
-    mpdStore.removeFromPlaylist(draggedTrackPos)
+    await mpdStore.fetchPlaylist()
+    if (draggedTrackPos < mpdStore.playlist.length) {
+      mpdStore.removeFromPlaylist(draggedTrackPos)
+    }
   }
   
   draggedItem = null

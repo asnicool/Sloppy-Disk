@@ -827,9 +827,10 @@ func GetPlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	playlistInfo := models.PlaylistInfo{
-		Items:      items,
-		Length:     status.PlaylistLength, // Use the authoritative length from status
-		CurrentPos: status.PlaylistPos,
+		Items:          items,
+		Length:         status.PlaylistLength, // Use the authoritative length from status
+		CurrentPos:     status.PlaylistPos,
+		CurrentSongPath: status.CurrentSong.Path,
 	}
 
 	log.Printf("[API] GetPlaylist: Success (took %v total)", time.Since(start))

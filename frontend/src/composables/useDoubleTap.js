@@ -213,10 +213,19 @@ export function useDoubleTapSimple(options = {}) {
     }
   }
 
+  const reset = () => {
+    for (const timer of tapTimers.values()) {
+      clearTimeout(timer)
+    }
+    tapTimers.clear()
+    tapCounts.clear()
+  }
+
   return {
     bind,
     handlers,
-    handleTap
+    handleTap,
+    reset
   }
 }
 

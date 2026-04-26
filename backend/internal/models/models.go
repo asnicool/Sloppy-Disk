@@ -46,9 +46,10 @@ type PlaylistItem struct {
 
 // PlaylistInfo represents the full playlist state for the frontend
 type PlaylistInfo struct {
-	Items      []PlaylistItem `json:"items"`
-	Length     int            `json:"length"`
-	CurrentPos int            `json:"currentPos"`
+	Items          []PlaylistItem `json:"items"`
+	Length         int            `json:"length"`
+	CurrentPos     int            `json:"currentPos"`
+	CurrentSongPath string        `json:"currentSongPath,omitempty"` // Path of currently playing song for identity-based tracking
 }
 
 // MPDStatus represents current MPD playback status

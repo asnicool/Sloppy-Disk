@@ -167,17 +167,15 @@ func checkN50BeforePlayback() error {
 	return nil
 }
 
-// wrapPlaybackWithN50Check wraps a playback handler with N50 check
+// wrapPlaybackWithN50Check wraps a playback handler with async N50 check
 func wrapPlaybackWithN50Check(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Check N50 before playback
-		if err := checkN50BeforePlayback(); err != nil {
-			log.Printf("[N50] Error ensuring N50 is ready: %v", err)
-			// Don't fail the playback, just log the error
-			// This ensures music can still play even if N50 has issues
-		}
+		go func() {
+			if err := checkN50BeforePlayback(); err != nil {
+				log.Printf("[N50] Error ensuring N50 is ready: %v", err)
+			}
+		}()
 
-		// Call the original handler
 		handler(w, r)
 	}
 }

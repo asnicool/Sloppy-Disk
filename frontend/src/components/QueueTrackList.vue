@@ -52,7 +52,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import draggable from 'vuedraggable'
 import { useMpdStore } from '@/stores/mpd'
 import { useDoubleTapSimple } from '@/composables/useDoubleTap'
@@ -74,7 +74,10 @@ const props = defineProps({
 
 const emit = defineEmits(['track-move', 'track-remove', 'drag-start', 'drag-end', 'dragging'])
 const mpdStore = useMpdStore()
-const { handlers: doubleTapHandlers } = useDoubleTapSimple({ delay: 300 })
+const { handlers: doubleTapHandlers, reset: resetDoubleTap } = useDoubleTapSimple({ delay: 300 })
+const isDraggingTrack = ref(false)
+const lastTrackDragEnd = ref(0)
+const TRACK_DRAG_COOLDOWN = 800
 
 const getTrackClass = (element) => {
   if (element.isCurrentTrack) {
@@ -87,7 +90,6 @@ const getTrackClass = (element) => {
 }
 
 const getDotSizeClass = (size) => {
-  // Performance optimization: cache the class names
   const sizeMap = {
     small: 'dot-size-small',
     medium: 'dot-size-medium',
@@ -97,10 +99,16 @@ const getDotSizeClass = (size) => {
 }
 
 const playTrack = (pos) => {
+  const timeSinceDrag = Date.now() - lastTrackDragEnd.value
+  if (timeSinceDrag < TRACK_DRAG_COOLDOWN) {
+    console.log('[QueueTrackList] Blocked track play — within drag cooldown (%dms)', timeSinceDrag)
+    return
+  }
   mpdStore.playTrack(pos)
 }
 
 const getTrackHandlers = (element) => {
+  if (isDraggingTrack.value) return {}
   return doubleTapHandlers(() => playTrack(element.pos))
 }
 
@@ -119,6 +127,8 @@ const handleChange = (event) => {
 }
 
 const onDragStart = (event) => {
+  isDraggingTrack.value = true
+  resetDoubleTap()
   emit('drag-start')
   const el = event?.item
   if (el) {
@@ -136,6 +146,9 @@ const onDragStart = (event) => {
 }
 
 const onDragEnd = () => {
+  isDraggingTrack.value = false
+  lastTrackDragEnd.value = Date.now()
+  resetDoubleTap()
   emit('drag-end')
 }
 </script>

@@ -90,6 +90,47 @@ var (
 	}
 )
 
+const (
+	connectionCooldownBase = 30 * time.Second
+	connectionCooldownMax  = 5 * time.Minute
+)
+
+type connectionHealth struct {
+	mu                  sync.RWMutex
+	lastFailure         time.Time
+	consecutiveFailures int
+}
+
+func (h *connectionHealth) RecordFailure() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.lastFailure = time.Now()
+	h.consecutiveFailures++
+	return h.consecutiveFailures
+}
+
+func (h *connectionHealth) RecordSuccess() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.consecutiveFailures = 0
+	h.lastFailure = time.Time{}
+}
+
+func (h *connectionHealth) IsAvailable() bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if h.consecutiveFailures == 0 {
+		return true
+	}
+	cooldown := time.Duration(h.consecutiveFailures) * connectionCooldownBase
+	if cooldown > connectionCooldownMax {
+		cooldown = connectionCooldownMax
+	}
+	return time.Since(h.lastFailure) >= cooldown
+}
+
+var connHealth = &connectionHealth{}
+
 // Client represents an N50 HIFI component client
 type Client struct {
 	mu          sync.Mutex
@@ -136,6 +177,10 @@ func isEnabled() bool {
 
 // EnsureConnection ensures the TCP connection is established
 func (c *Client) EnsureConnection() error {
+	if !connHealth.IsAvailable() {
+		return fmt.Errorf("N50 connection is in cooldown (device unreachable)")
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -144,16 +189,13 @@ func (c *Client) EnsureConnection() error {
 	}
 
 	if c.conn != nil {
-		// Check if connection is still alive
 		c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 		one := make([]byte, 1)
 		if _, err := c.conn.Read(one); err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				// Still alive
 				c.conn.SetReadDeadline(time.Time{})
 				return nil
 			}
-			// Connection dead
 			c.conn.Close()
 			c.conn = nil
 			c.isConnected = false
@@ -169,6 +211,8 @@ func (c *Client) EnsureConnection() error {
 		conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 		if err != nil {
 			c.isConnected = false
+			attempt := connHealth.RecordFailure()
+			log.Printf("[N50] Connection failed (attempt %d), cooldown active: %v", attempt, err)
 			return fmt.Errorf("failed to connect to N50: %w", err)
 		}
 
@@ -177,6 +221,7 @@ func (c *Client) EnsureConnection() error {
 		c.writer = bufio.NewWriter(conn)
 		c.lastUsed = time.Now()
 		c.isConnected = true
+		connHealth.RecordSuccess()
 
 		log.Printf("[N50] Connected to %s", addr)
 	}
@@ -233,6 +278,7 @@ func (c *Client) sendCommand(command string) (string, error) {
 	}
 
 	c.lastUsed = time.Now()
+	connHealth.RecordSuccess()
 	return strings.TrimSpace(response), nil
 }
 
@@ -411,6 +457,16 @@ func ResetClient() {
 // IsEnabled returns whether N50 control is enabled
 func IsEnabled() bool {
 	return isEnabled()
+}
+
+// IsConnectionHealthy returns whether the N50 connection is not in cooldown
+func IsConnectionHealthy() bool {
+	return connHealth.IsAvailable()
+}
+
+// ResetConnectionHealth clears any connection failure state
+func ResetConnectionHealth() {
+	connHealth.RecordSuccess()
 }
 
 // ShouldAutoControl returns whether auto control is enabled

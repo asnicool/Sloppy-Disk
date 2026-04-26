@@ -25,23 +25,61 @@ func MovePlaylistTrack(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[API] MovePlaylistTrack request: From=%d, To=%d, Length=%d", req.From, req.To, req.Length)
 
-	var err error
+	// DETECTION: Capture current song before move to detect unexpected changes
+	statusBefore, errPre := mpd.GetClient().GetStatus()
+	if errPre != nil {
+		log.Printf("[API] MovePlaylistTrack: Failed to get status before move: %v", errPre)
+	} else if statusBefore != nil {
+		log.Printf("[API] MovePlaylistTrack PRE-MOVE: currentPos=%d, currentSong='%s' (path=%s)",
+			statusBefore.PlaylistPos, statusBefore.CurrentSong.Title, statusBefore.CurrentSong.Path)
+	}
+
+	// Perform the move operation
+	var moveErr error
 	if req.Length > 1 {
 		// Move a range [From, From+Length)
 		// Note: MPD move range end is exclusive, so From+Length is correct for [From, From+Length)
 		log.Printf("[API] Calling MPD MoveRange: start=%d, end=%d, to=%d", req.From, req.From+req.Length, req.To)
-		err = mpd.GetClient().MoveRange(req.From, req.From+req.Length, req.To)
+		moveErr = mpd.GetClient().MoveRange(req.From, req.From+req.Length, req.To)
 	} else {
 		log.Printf("[API] Calling MPD Move: from=%d, to=%d", req.From, req.To)
-		err = mpd.GetClient().Move(req.From, req.To)
+		moveErr = mpd.GetClient().Move(req.From, req.To)
 	}
 
-	if err != nil {
-		log.Printf("[API] Move failed: %v", err)
-		SendError(w, http.StatusInternalServerError, err.Error())
+	if moveErr != nil {
+		log.Printf("[API] Move failed: %v", moveErr)
+		SendError(w, http.StatusInternalServerError, moveErr.Error())
 		return
 	}
 	log.Printf("[API] Move successful")
+
+	// DETECTION: Capture current song after move to detect unexpected jumps
+	statusAfter, errPost := mpd.GetClient().GetStatus()
+	if errPost != nil {
+		log.Printf("[API] MovePlaylistTrack: Failed to get status after move: %v", errPost)
+	} else if statusBefore != nil && statusAfter != nil {
+		log.Printf("[API] MovePlaylistTrack POST-MOVE: currentPos=%d, currentSong='%s' (path=%s)",
+			statusAfter.PlaylistPos, statusAfter.CurrentSong.Title, statusAfter.CurrentSong.Path)
+
+		// Check if the current song identity changed unexpectedly
+		beforePath := statusBefore.CurrentSong.Path
+		afterPath := statusAfter.CurrentSong.Path
+		beforePos := statusBefore.PlaylistPos
+		if beforePath != "" && afterPath != "" && beforePath != afterPath {
+			// The current song changed! This is expected if we moved the currently playing track itself.
+			// But if we moved a different range, this indicates a bug - the current track jumped.
+			movedCurrent := (req.From <= beforePos && beforePos < req.From+req.Length)
+			if !movedCurrent {
+				log.Printf("[API] ⚠️  DETECTED CURRENT TRACK JUMP! Before:'%s' → After:'%s'. "+
+					"This suggests the move operation caused the current position to point to a different track. "+
+					"Moved range [%d:%d) to %d, but current track at pos %d was NOT in moved range.",
+					beforePath, afterPath, req.From, req.From+req.Length, req.To, beforePos)
+			} else {
+				log.Printf("[API] Current track moved (expected): '%s' → '%s'", beforePath, afterPath)
+			}
+		}
+	}
+
 	SendJSON(w, models.APIResponse{Success: true})
 }
 
