@@ -7,13 +7,13 @@ import (
 	"net/url"
 	"time"
 
-	"mpd-client-modern/internal/config"
-	"mpd-client-modern/internal/models"
+	"sloppy-disk/internal/config"
+	"sloppy-disk/internal/models"
 )
 
 const (
 	albumArtAPIURL    = "https://api.albumart.digital/v1"
-	albumArtUserAgent = "mpd-client-modern/1.0"
+	albumArtUserAgent = "sloppy-disk/1.0"
 )
 
 // AlbumArtProvider implements the Provider interface for AlbumArt.digital

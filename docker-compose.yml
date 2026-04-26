@@ -19,14 +19,14 @@ services:
       timeout: 10s
       retries: 3
 
-  mpd-client-frontend:
+  sloppy-disk-frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
       - "3000:80"
     depends_on:
-      - mpd-client-backend
+      - sloppy-disk-backend
     restart: unless-stopped
 
   # Optional: MPD server for testing

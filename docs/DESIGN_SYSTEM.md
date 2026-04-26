@@ -1,8 +1,8 @@
-# MPD Client Design System
+# Sloppy Disk Design System
 
 ## Overview
 
-This document outlines the design system for the MPD Client frontend, including design tokens, components, patterns, and best practices.
+This document outlines the design system for the Sloppy Disk frontend, including design tokens, components, patterns, and best practices.
 
 ---
 

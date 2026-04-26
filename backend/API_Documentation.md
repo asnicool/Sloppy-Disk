@@ -1,6 +1,6 @@
-# MPD Client Modern - Backend API Documentation
+# Sloppy Disk - Backend API Documentation
 
-This document lists all the API endpoints implemented in the Go backend for the MPD Client Modern application.
+This document lists all the API endpoints implemented in the Go backend for Sloppy Disk.
 
 ## API Endpoints
 

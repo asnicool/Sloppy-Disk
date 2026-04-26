@@ -1,33 +1,65 @@
-# MPD Web Client - Modern Rewrite
+# Sloppy Disk
 
-A lightweight, modern MPD (Music Player Daemon) web client built with Go backend and Vue 3 frontend. Designed for low-memory systems with excellent mobile support and native app-like experience.
+A lightweight, modern MPD (Music Player Daemon) web client built with Go backend and Vue 3 frontend. Designed for low-memory systems with excellent mobile support and a native app-like experience.
 
-## Features
+## The Unique Feature: Random Album View
+
+**Let chance decide what you listen to.**
+
+Sloppy Disk's standout feature is its **Random Album View** - a deliberately anti-algorithmic approach to discovering your own music collection. Instead of AI-powered recommendations, popularity rankings, or "listeners also enjoyed" suggestions, Random Album View simply picks albums at random from your library. No machine learning, no collaborative filtering, no "because you listened to..." - just pure, unadulterated chance.
+
+The idea is simple: you own your music, and sometimes the best way to rediscover it is to let randomness guide you. Hit the refresh button and get a fresh batch of albums you may have forgotten you had. It's the digital equivalent of flipping through your record collection with your eyes closed and pulling out whatever your hand lands on.
+
+## A Confession: This Is Pure AI Vibe Coding
+
+Let's be completely transparent: **I cannot code.** Like, at all. This entire application was built through AI-assisted "vibe coding" - the process of describing what you want to a large language model and hoping for the best. Every line of Go, every Vue component, every WebSocket handler - all generated through conversations with AI.
+
+Why? Because I needed a music player that worked the way I wanted it to, and the existing options didn't quite fit. I had the ideas, the taste, and the stubbornness to keep iterating until the AI produced something that actually worked. The result is Sloppy Disk - a functional, decent-looking MPD client born entirely from the gap between "I know what I want" and "I don't know how to build it."
+
+If you're a developer looking at this code and wincing - I get it. But it works, it's lightweight, and it does exactly what I need. Sometimes that's enough.
+
+## Inspired By
+
+This project was originally inspired by **[mpd-nodejs-client](https://github.com/kpillis/mpd-nodejs-client)** by **Krisztian Pillis** ([@kpillis](https://github.com/kpillis)). That project proved that a lightweight web interface for MPD was not only possible but genuinely useful. Sloppy Disk started as an attempt to modernize that concept with a Go backend and Vue 3 frontend, then grew into its own thing with features I needed (especially that random album picker).
+
+Thank you, Krisztian, for showing the way.
+
+## Open Source Packages Used
+
+This project stands on the shoulders of giants. Here are the open source packages that make Sloppy Disk possible:
 
 ### Backend (Go)
-- **Memory Efficient**: Uses only 2-10MB memory baseline
-- **MPD Integration**: Direct connection to MPD with smart connection pooling
-- **Pagination**: Prevents MPD overload with intelligent data pagination
-- **WebSocket Support**: Real-time status updates
-- **RESTful API**: Clean API design with proper error handling
-- **Single Binary**: Easy deployment without runtime dependencies
+- **[Go](https://github.com/golang/go)** - The programming language itself
+- **[gorilla/mux](https://github.com/gorilla/mux)** - HTTP router and URL matcher
+- **[gorilla/websocket](https://github.com/gorilla/websocket)** - WebSocket protocol implementation
+- **[dhowden/tag](https://github.com/dhowden/tag)** - Audio tag reading (MP3, MP4, FLAC, OGG)
+- **[michiwend/gomusicbrainz](https://github.com/michiwend/gomusicbrainz)** - MusicBrainz API client
+- **[sahilm/fuzzy](https://github.com/sahilm/fuzzy)** - Fuzzy string matching
+- **[tetratelabs/wazero](https://github.com/tetratelabs/wazero)** - Zero dependency WebAssembly runtime
+- **[senan/taglib](https://github.com/senan-dev/taglib)** - TagLib bindings for Go (audio metadata)
 
 ### Frontend (Vue 3)
-- **Mobile-First**: Optimized for touch devices and small screens
-- **PWA Support**: Installable web app with offline capabilities
-- **Real-time Updates**: WebSocket connection for live MPD status
-- **Responsive Design**: Works seamlessly on mobile, tablet, and desktop
-- **Modern Vue 3**: Composition API, Pinia state management
-- **Tailwind CSS**: Utility-first styling with custom design system
+- **[Vue.js](https://github.com/vuejs/core)** - Reactive JavaScript framework
+- **[Vue Router](https://github.com/vuejs/router)** - Official router for Vue.js
+- **[Pinia](https://github.com/vuejs/pinia)** - State management for Vue.js
+- **[Vite](https://github.com/vitejs/vite)** - Next generation frontend build tool
+- **[Tailwind CSS](https://github.com/tailwindlabs/tailwindcss)** - Utility-first CSS framework
+- **[Axios](https://github.com/axios/axios)** - Promise-based HTTP client
+- **[Fuse.js](https://github.com/krisk/Fuse)** - Lightweight fuzzy-search library
+- **[SortableJS](https://github.com/SortableJS/Sortable)** - Drag-and-drop reordering
+- **[vuedraggable](https://github.com/SortableJS/Vue.Draggable)** - Vue component for SortableJS
+- **[lodash-es](https://github.com/lodash/lodash)** - Modern JavaScript utility library
 
-### Key Improvements Over Original
-- ✅ **No Database**: Relies entirely on MPD database
-- ✅ **Smart Pagination**: Prevents MPD connection issues
-- ✅ **Modern Stack**: Go + Vue 3 instead of Node.js + Angular 1.5
-- ✅ **Mobile Optimized**: Touch-friendly interface
-- ✅ **PWA**: Can be installed like a native app
-- ✅ **Real-time**: WebSocket for instant updates
-- ✅ **Lightweight**: Minimal bundle size and memory usage
+## Heartfelt Thanks
+
+To the countless humans who made this possible:
+
+- **The MPD team** - For building the rock-solid Music Player Daemon that has been serving music lovers for decades. Your work is the foundation everything here is built on.
+- **The Go team** - For creating a language that's fast, simple, and efficient. Perfect for someone who needs the computer to do the heavy lifting.
+- **The Vue.js team** - For a framework that makes reactive UIs almost understandable, even to someone who can't code.
+- **Every open source maintainer listed above** - You built the tools, fixed the bugs, wrote the docs, and answered the issues. This project is 100% built on your unpaid labor and generosity.
+- **Krisztian Pillis** - For the original mpd-nodejs-client that inspired this whole adventure.
+- **The AI models** that patiently turned my vague descriptions into working code. You didn't judge my lack of coding skills, and I appreciate that.
 
 ## Quick Start
 
@@ -38,20 +70,15 @@ A lightweight, modern MPD (Music Player Daemon) web client built with Go backend
 
 ### Installation
 
-1. **Clone and setup:**
-   ```bash
-   cd mpd-client-modern
-   ```
-
-2. **Install frontend dependencies:**
+1. **Install frontend dependencies:**
    ```bash
    cd frontend
    npm install
    ```
 
-3. **Install backend dependencies:**
+2. **Install backend dependencies:**
    ```bash
-   cd ../backend
+   cd backend
    go mod tidy
    ```
 
@@ -82,12 +109,12 @@ A lightweight, modern MPD (Music Player Daemon) web client built with Go backend
 2. **Build backend:**
    ```bash
    cd backend
-   go build -o mpd-server cmd/server/main.go
+   go build -o sloppy-disk-backend cmd/server/main.go
    ```
 
 3. **Deploy:**
    - Copy `frontend/dist/` to your web server
-   - Run `./mpd-server` with your MPD server
+   - Run `./sloppy-disk-backend` with your MPD server
    - Configure web server to serve frontend and proxy API to backend
 
 ## Architecture
@@ -100,7 +127,15 @@ backend/
 │   ├── api/                 # HTTP handlers
 │   ├── mpd/                 # MPD client wrapper
 │   ├── models/              # Data models
-│   └── middleware/          # CORS, logging, etc.
+│   ├── config/              # Configuration management
+│   ├── coverart/            # Cover art management
+│   ├── metadata/            # Metadata providers (MusicBrainz, Discogs, GNUDB)
+│   ├── albumcache/          # Album caching layer
+│   ├── search/              # Search functionality
+│   ├── sync/                # Sync operations
+│   ├── tags/                # Tag reading/writing
+│   ├── artistimage/         # Artist image management
+│   └── n50/                 # N50 HIFI component integration
 └── go.mod
 ```
 
@@ -112,10 +147,11 @@ frontend/
 │   ├── views/               # Page components
 │   ├── stores/              # Pinia state management
 │   ├── composables/         # Vue composables
+│   ├── services/            # Service layer
 │   ├── utils/               # Helper functions
 │   ├── router/              # Vue Router configuration
 │   └── styles/              # CSS and styling
-├── public/                  # Static assets
+├── public/                  # Static assets (PWA, icons)
 ├── index.html               # Main HTML template
 ├── package.json             # Dependencies and scripts
 └── vite.config.js           # Vite configuration
@@ -129,6 +165,7 @@ frontend/
 
 ### Browse Music
 - `GET /api/albums?page=1&limit=50&search=artist:beatles` - Paginated album list
+- `GET /api/albums/random?count=30` - Random album selection
 - `GET /api/artists?page=1&limit=50` - Paginated artist list
 - `GET /api/album/{artist}/{album}?page=1&limit=50` - Album songs
 
@@ -146,54 +183,10 @@ frontend/
 - `POST /api/playlist/add/{uri}` - Add song to playlist
 - `POST /api/playlist/remove/{position}` - Remove from playlist
 
-## Performance Targets
-
-- **Initial Load**: < 2 seconds on 3G
-- **API Response**: < 100ms for cached data
-- **MPD Commands**: < 50ms end-to-end latency
-- **Memory Usage**: < 10MB backend, < 5MB frontend
-- **Bundle Size**: < 100KB total (gzipped)
-
-## Mobile Optimization
-
-### Touch-Friendly Interface
-- Minimum 44px touch targets
-- Swipe gestures for navigation
-- Long-press context menus
-- Pull-to-refresh functionality
-
-### PWA Features
-- Installable on home screen
-- Offline functionality
-- Background sync
-- Push notifications
-
-### Native App Experience
-- Full-screen mode
-- Status bar styling
-- App-like navigation
-- Smooth animations
-
-## Configuration
-
-### Backend Configuration
-Edit `backend/cmd/server/main.go` to change:
-- MPD host/port (default: localhost:6600)
-- API port (default: 7070)
-- Pagination limits
-- CORS settings
-
-### Frontend Configuration
-Edit `frontend/vite.config.js` to change:
-- API proxy settings
-- PWA configuration
-- Build optimization
-
 ## Deployment
 
 ### Docker (Recommended)
 ```bash
-# Build and run with Docker Compose
 docker-compose up --build
 ```
 
@@ -203,54 +196,10 @@ docker-compose up --build
 3. Run backend binary
 4. Configure reverse proxy
 
-### Systemd Service
-Create `/etc/systemd/system/mpd-client.service`:
-```ini
-[Unit]
-Description=MPD Web Client
-After=network.target
-
-[Service]
-Type=simple
-User=mpd
-WorkingDirectory=/opt/mpd-client
-ExecStart=/opt/mpd-client/mpd-server
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-## Troubleshooting
-
-### Connection Issues
-- Verify MPD is running: `mpd status`
-- Check firewall settings
-- Ensure MPD allows TCP connections
-
-### Performance Issues
-- Adjust pagination limits in backend
-- Enable MPD database updates
-- Monitor MPD connection count
-
-### Mobile Issues
-- Enable HTTPS for PWA features
-- Check viewport meta tags
-- Test touch targets
-
-## Contributing
-
-1. Fork the repository
-2. Create feature branch
-3. Make changes with tests
-4. Submit pull request
-
 ## License
 
 MIT License - see LICENSE file for details
 
-## Acknowledgments
+## Final Words
 
-- MPD team for the excellent music player daemon
-- Vue.js team for the reactive framework
-- Go team for the efficient programming language
+This project exists because open source software and AI made it possible for someone with zero coding skills to build exactly the tool they needed. If Sloppy Disk is useful to you, that's wonderful. If the code makes you cringe, well - now you know why. Either way, be kind to each other and support open source maintainers. They're the real heroes here.

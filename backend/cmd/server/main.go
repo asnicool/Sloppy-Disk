@@ -13,11 +13,11 @@ import (
 	"syscall"
 	"time"
 
-	"mpd-client-modern/internal/albumcache"
-	"mpd-client-modern/internal/api"
-	"mpd-client-modern/internal/config"
-	"mpd-client-modern/internal/models"
-	"mpd-client-modern/internal/mpd"
+	"sloppy-disk/internal/albumcache"
+	"sloppy-disk/internal/api"
+	"sloppy-disk/internal/config"
+	"sloppy-disk/internal/models"
+	"sloppy-disk/internal/mpd"
 
 	"github.com/gorilla/mux"
 )

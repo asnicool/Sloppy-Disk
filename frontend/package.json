@@ -1,7 +1,7 @@
 {
-  "name": "mpd-client-frontend",
+  "name": "sloppy-disk",
   "version": "1.0.0",
-  "description": "Modern MPD Web Client - Lightweight Frontend",
+  "description": "Sloppy Disk - Lightweight music player for MPD",
   "type": "module",
   "scripts": {
     "dev": "vite",

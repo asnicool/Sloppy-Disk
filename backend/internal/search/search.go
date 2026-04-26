@@ -3,8 +3,8 @@ package search
 import (
 	"context"
 
-	"mpd-client-modern/internal/albumcache"
-	"mpd-client-modern/internal/models"
+	"sloppy-disk/internal/albumcache"
+	"sloppy-disk/internal/models"
 )
 
 func FuzzySearch(ctx context.Context, query string) ([]models.Album, error) {

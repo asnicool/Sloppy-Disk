@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"mpd-client-modern/internal/config"
+	"sloppy-disk/internal/config"
 )
 
 func TestPathMapping(t *testing.T) {

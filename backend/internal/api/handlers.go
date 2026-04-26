@@ -14,14 +14,14 @@ import (
 	"strings"
 	"time"
 
-	"mpd-client-modern/internal/artistimage"
-	"mpd-client-modern/internal/config"
-	"mpd-client-modern/internal/coverart"
-	"mpd-client-modern/internal/metadata"
-	"mpd-client-modern/internal/models"
-	"mpd-client-modern/internal/mpd"
-	"mpd-client-modern/internal/n50"
-	"mpd-client-modern/internal/sync"
+	"sloppy-disk/internal/artistimage"
+	"sloppy-disk/internal/config"
+	"sloppy-disk/internal/coverart"
+	"sloppy-disk/internal/metadata"
+	"sloppy-disk/internal/models"
+	"sloppy-disk/internal/mpd"
+	"sloppy-disk/internal/n50"
+	"sloppy-disk/internal/sync"
 
 	"github.com/gorilla/mux"
 )

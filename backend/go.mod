@@ -1,4 +1,4 @@
-module mpd-client-modern
+module sloppy-disk
 
 go 1.23.0
 

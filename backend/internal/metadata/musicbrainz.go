@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"mpd-client-modern/internal/models"
+	"sloppy-disk/internal/models"
 
 	"github.com/michiwend/gomusicbrainz"
 )
@@ -18,7 +18,7 @@ import (
 const (
 	musicBrainzAPIURL    = "https://musicbrainz.org"
 	musicBrainzCoverURL  = "https://coverartarchive.org"
-	musicBrainzUserAgent = "mpd-client-modern"
+	musicBrainzUserAgent = "sloppy-disk"
 	musicBrainzVersion   = "1.0"
 	musicBrainzContact   = "contact@example.com"
 )

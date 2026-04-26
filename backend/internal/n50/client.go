@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"mpd-client-modern/internal/config"
+	"sloppy-disk/internal/config"
 )
 
 // Command constants for N50 component

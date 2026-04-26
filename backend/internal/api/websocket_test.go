@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"mpd-client-modern/internal/models"
+	"sloppy-disk/internal/models"
 )
 
 func TestClientConnection_ContextCancel(t *testing.T) {

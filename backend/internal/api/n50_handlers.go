@@ -4,8 +4,8 @@ import (
 	"log"
 	"net/http"
 
-	"mpd-client-modern/internal/models"
-	"mpd-client-modern/internal/n50"
+	"sloppy-disk/internal/models"
+	"sloppy-disk/internal/n50"
 
 	"github.com/gorilla/mux"
 )

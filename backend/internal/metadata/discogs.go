@@ -9,13 +9,13 @@ import (
 	"strconv"
 	"time"
 
-	"mpd-client-modern/internal/config"
-	"mpd-client-modern/internal/models"
+	"sloppy-disk/internal/config"
+	"sloppy-disk/internal/models"
 )
 
 const (
 	discogsAPIURL    = "https://api.discogs.com"
-	discogsUserAgent = "mpd-client-modern/1.0"
+	discogsUserAgent = "sloppy-disk/1.0"
 )
 
 // DiscogsProvider implements the Provider interface for Discogs

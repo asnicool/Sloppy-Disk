@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"mpd-client-modern/internal/models"
+	"sloppy-disk/internal/models"
 )
 
 // MockError is a simple error type for testing

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"mpd-client-modern/internal/models"
-	"mpd-client-modern/internal/mpd"
+	"sloppy-disk/internal/models"
+	"sloppy-disk/internal/mpd"
 
 	"github.com/gorilla/websocket"
 )

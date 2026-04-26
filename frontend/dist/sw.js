@@ -1,7 +1,7 @@
-// Service Worker for MPD Client PWA
-const CACHE_NAME = 'mpd-client-v1';
-const STATIC_CACHE = 'mpd-client-static-v1';
-const API_CACHE = 'mpd-client-api-v1';
+// Service Worker for Sloppy Disk PWA
+const CACHE_NAME = 'sloppy-disk-v1';
+const STATIC_CACHE = 'sloppy-disk-static-v1';
+const API_CACHE = 'sloppy-disk-api-v1';
 
 // Static assets to cache on install
 const STATIC_ASSETS = [
@@ -184,7 +184,7 @@ self.addEventListener('push', (event) => {
   console.log('[SW] Push received:', data);
   
   event.waitUntil(
-    self.registration.showNotification(data.title || 'MPD Client', {
+    self.registration.showNotification(data.title || 'Sloppy Disk', {
       body: data.body || 'New notification',
       icon: '/img/icon-192x192.png',
       badge: '/img/favicon-32x32.png',
