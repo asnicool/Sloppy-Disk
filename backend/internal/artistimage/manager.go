@@ -16,6 +16,35 @@ import (
 	"sloppy-disk/internal/models"
 )
 
+func sanitizeArtistName(name string) string {
+	name = filepath.Base(name)
+	name = strings.TrimSpace(name)
+	name = strings.ReplaceAll(name, string(filepath.Separator), "")
+	name = strings.ReplaceAll(name, "/", "")
+	name = strings.ReplaceAll(name, "\\", "")
+	if name == "." || name == ".." || name == "" {
+		name = "unknown"
+	}
+	return name
+}
+
+func safeArtistDir(rootDir, artistName string) (string, error) {
+	safe := sanitizeArtistName(artistName)
+	artistDir := filepath.Join(rootDir, safe)
+	absDir, err := filepath.Abs(artistDir)
+	if err != nil {
+		return "", fmt.Errorf("invalid path: %w", err)
+	}
+	absRoot, err := filepath.Abs(rootDir)
+	if err != nil {
+		return "", fmt.Errorf("invalid root: %w", err)
+	}
+	if !strings.HasPrefix(absDir+string(filepath.Separator), absRoot+string(filepath.Separator)) && absDir != absRoot {
+		return "", fmt.Errorf("path traversal detected for artist: %s", artistName)
+	}
+	return artistDir, nil
+}
+
 type Manager struct {
 	client *http.Client
 	mu     sync.Mutex
@@ -164,8 +193,11 @@ func (m *Manager) saveImage(artistName, contentType string, body io.Reader) (str
 		return "", fmt.Errorf("neither CoverArtRoot nor MusicRoot is configured")
 	}
 
-	// Create artist directory
-	artistDir := filepath.Join(rootDir, artistName)
+	// Create artist directory (sanitized to prevent path traversal)
+	artistDir, err := safeArtistDir(rootDir, artistName)
+	if err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(artistDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create artist directory: %w", err)
 	}
@@ -229,7 +261,10 @@ func (m *Manager) getArtistImagePath(artistName string) string {
 		return ""
 	}
 
-	artistDir := filepath.Join(rootDir, artistName)
+	artistDir, err := safeArtistDir(rootDir, artistName)
+	if err != nil {
+		return ""
+	}
 
 	// Check for Artist.jpg, Artist.png, etc.
 	extensions := []string{".jpg", ".jpeg", ".png", ".webp", ".gif"}
